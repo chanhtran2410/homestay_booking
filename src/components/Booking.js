@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
     Form,
     Input,
@@ -7,24 +7,14 @@ import {
     Typography,
     Modal,
     Select,
-    Flex,
     DatePicker,
 } from 'antd';
 import dayjs from 'dayjs';
+import { useAuth } from '../App';
 
 import './styles.css';
 const { Title } = Typography;
 
-const CLIENT_ID =
-    process.env.REACT_APP_GOOGLE_CLIENT_ID ||
-    '311093634768-ps25fkb4hmm3d6bq86rdhh8cdi9hbd5o.apps.googleusercontent.com';
-const API_KEY =
-    process.env.REACT_APP_GOOGLE_API_KEY ||
-    'AIzaSyDO1vCsfDoJRAPt4pQ6BnRjtxjf_fnG7zQ';
-const DISCOVERY_DOCS = [
-    'https://sheets.googleapis.com/$discovery/rest?version=v4',
-];
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const SPREADSHEET_ID =
     process.env.REACT_APP_SPREADSHEET_ID ||
     '1re26jyCc2_gebIn5BRW7DTHAR6QmFTB7k5iSC3UhRrc';
@@ -32,94 +22,20 @@ const SHEET_NAME = 'Sheet1';
 
 const Booking = () => {
     const [form] = Form.useForm();
-    const [isSignedIn, setIsSignedIn] = useState(false);
-    const [accessToken, setAccessToken] = useState(null);
     const [roomStatus, setRoomStatus] = useState(null);
+    const { isSignedIn } = useAuth();
 
-    useEffect(() => {
-        const initializeGoogleServices = async () => {
-            try {
-                await new Promise((resolve) => {
-                    const checkLibraries = () => {
-                        if (window.gapi && window.google) {
-                            resolve();
-                        } else {
-                            setTimeout(checkLibraries, 100);
-                        }
-                    };
-                    checkLibraries();
-                });
+    // Function to convert column index to Excel column letter(s)
+    const getColumnLetter = (columnIndex) => {
+        let result = '';
+        let index = columnIndex;
 
-                await new Promise((resolve, reject) => {
-                    window.gapi.load('client', async () => {
-                        try {
-                            await window.gapi.client.init({
-                                apiKey: API_KEY,
-                                discoveryDocs: DISCOVERY_DOCS,
-                            });
-                            resolve();
-                        } catch (error) {
-                            reject(error);
-                        }
-                    });
-                });
-
-                window.google.accounts.id.initialize({
-                    client_id: CLIENT_ID,
-                    callback: () => {},
-                });
-
-                console.log('Google services initialized successfully');
-            } catch (error) {
-                console.error('Failed to initialize Google services:', error);
-                message.error('Failed to initialize Google services');
-            }
-        };
-
-        initializeGoogleServices();
-    }, []);
-
-    const handleLogin = async () => {
-        try {
-            const tokenClient = window.google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: (response) => {
-                    if (response.error) {
-                        console.error('OAuth error:', response.error);
-                        message.error(`Login failed: ${response.error}`);
-                        return;
-                    }
-
-                    console.log(
-                        'Access token received:',
-                        response.access_token
-                    );
-                    setAccessToken(response.access_token);
-                    setIsSignedIn(true);
-                    message.success('Signed in with Google successfully!');
-
-                    window.gapi.client.setToken({
-                        access_token: response.access_token,
-                    });
-                },
-            });
-
-            tokenClient.requestAccessToken();
-        } catch (error) {
-            console.error('Login failed:', error);
-            message.error('Login failed. Please try again.');
+        while (index >= 0) {
+            result = String.fromCharCode(65 + (index % 26)) + result;
+            index = Math.floor(index / 26) - 1;
         }
-    };
 
-    const handleLogout = () => {
-        if (accessToken) {
-            window.google.accounts.oauth2.revoke(accessToken);
-        }
-        window.gapi.client.setToken(null);
-        setAccessToken(null);
-        setIsSignedIn(false);
-        message.success('Signed out successfully');
+        return result;
     };
 
     const confirmOverwrite = () =>
@@ -135,13 +51,13 @@ const Booking = () => {
         });
 
     const onFinish = async ({ date, roomId, name, value, price }) => {
-        const formattedDate = date.format('DD/MM/YYYY'); // e.g., '01/05/2025'
-
         try {
             if (!isSignedIn) {
                 message.error('Please sign in first');
                 return;
             }
+
+            const formattedDate = date.format('DD/MM/YYYY');
 
             const readRes =
                 await window.gapi.client.sheets.spreadsheets.values.get({
@@ -151,17 +67,30 @@ const Booking = () => {
 
             const data = readRes.result.values;
             const headers = data[0];
-            const dateIndex = headers.indexOf(formattedDate);
-            const roomRowIndex = data.findIndex((row) => row[1] === roomId);
 
-            if (dateIndex === -1 || roomRowIndex === -1) {
-                message.error('Invalid date or room ID');
+            const dateIndex = headers.indexOf(formattedDate);
+            const roomRowIndex = data.findIndex(
+                (row) => row && row[1] === roomId
+            );
+
+            if (dateIndex === -1) {
+                message.error(
+                    `Không tìm thấy ngày "${formattedDate}" trong bảng tính. Các cột có sẵn: ${headers
+                        .slice(2)
+                        .join(', ')}`
+                );
                 return;
             }
 
-            const range = `${SHEET_NAME}!${String.fromCharCode(
-                65 + dateIndex
-            )}${roomRowIndex + 1}`;
+            if (roomRowIndex === -1) {
+                message.error(
+                    `Không tìm thấy phòng "${roomId}" trong bảng tính`
+                );
+                return;
+            }
+
+            const columnLetter = getColumnLetter(dateIndex);
+            const range = `${SHEET_NAME}!${columnLetter}${roomRowIndex + 1}`;
             const currentValue = data?.[roomRowIndex]?.[dateIndex] || '';
 
             if (currentValue.trim() !== '') {
@@ -206,24 +135,17 @@ const Booking = () => {
                 Update Booking for Room
             </Title>
 
-            {!isSignedIn ? (
-                <Flex justify="center">
-                    <Button
-                        type="primary"
-                        onClick={handleLogin}
-                        className="booking-button"
-                    >
-                        Sign in with Google
-                    </Button>
-                </Flex>
-            ) : (
-                <div className="signed-in-bar">
-                    <Button onClick={handleLogout} className="booking-button">
-                        Sign out
-                    </Button>
-                    <span className="signed-in-text">
-                        ✓ Signed in with Google
-                    </span>
+            {!isSignedIn && (
+                <div
+                    style={{
+                        textAlign: 'center',
+                        padding: 40,
+                        background: '#f5f5f5',
+                        borderRadius: 8,
+                        marginBottom: 16,
+                    }}
+                >
+                    <p>Vui lòng đăng nhập để sử dụng chức năng này</p>
                 </div>
             )}
 
