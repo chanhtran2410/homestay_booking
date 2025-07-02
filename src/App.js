@@ -281,9 +281,6 @@ const Home = () => {
                     🏠 Home - Select a Functionality
                 </h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ color: '#52c41a' }}>
-                        ✓ {user?.email || 'Đã đăng nhập'}
-                    </span>
                     <Button size="small" onClick={handleLogout}>
                         Đăng xuất
                     </Button>
