@@ -1,48 +1,102 @@
-/* App.css */
-
+/* Reset & Base Styles */
 body {
-  font-family: 'Segoe UI', sans-serif;
   margin: 0;
-  padding: 0;
-  background-color: #f7f9fc;
-}
-
-.home-container {
-  padding: 40px 20px;
-  text-align: center;
-}
-
-.home-heading {
-  font-size: 2rem;
+  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f3f4f6;
   color: #333;
-  margin-bottom: 30px;
 }
 
+/* Home Container */
+.home-container {
+  max-width: 860px;
+  margin: 60px auto;
+  padding: 48px 32px;
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+/* Heading */
+.home-heading {
+  font-size: 30px;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin: 0;
+}
+
+/* Button Group Layout */
 .button-group {
   display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 16px;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 40px;
 }
 
+/* Navigation Button Style */
 .nav-button {
-  background-color: #1890ff;
-  color: white;
+  padding: 20px 28px;
+  font-size: 18px;
+  font-weight: 600;
+  background: linear-gradient(to right, #dbeafe, #bfdbfe);
+  color: #1e40af;
   border: none;
-  padding: 12px 24px;
-  font-size: 16px;
-  border-radius: 6px;
+  border-radius: 14px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  box-shadow: 0 6px 14px rgba(30, 64, 175, 0.1);
+  transition: all 0.3s ease;
+  text-align: left;
 }
 
 .nav-button:hover {
-  background-color: #40a9ff;
+  background: linear-gradient(to right, #c7d2fe, #a5b4fc);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 20px rgba(59, 130, 246, 0.2);
 }
 
+.nav-button:active {
+  transform: translateY(0px);
+  box-shadow: none;
+}
+
+/* Logout & User Info */
+.home-container .ant-btn {
+  background-color: #e0e7ff;
+  border: none;
+  color: #1e3a8a;
+  font-weight: 500;
+}
+
+.home-container .ant-btn:hover {
+  background-color: #c7d2fe;
+}
+
+/* Placeholder Component */
 .placeholder-page {
+  max-width: 600px;
+  margin: 120px auto;
   text-align: center;
-  padding: 60px 20px;
-  font-size: 1.5rem;
-  color: #666;
+  padding: 40px;
+  background-color: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+.placeholder-page h2 {
+  font-size: 28px;
+  font-weight: 600;
+  color: #3b82f6;
+  margin-bottom: 12px;
+}
+
+.placeholder-page p {
+  font-size: 16px;
+  color: #6b7280;
+}
+
+/* Spinner text */
+.ant-spin-nested-loading>div>.ant-spin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
