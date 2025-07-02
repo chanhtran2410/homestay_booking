@@ -8,8 +8,14 @@ import {
     Tag,
     Spin,
     Modal,
+    Button,
 } from 'antd';
-import { CalendarOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import {
+    CalendarOutlined,
+    InfoCircleOutlined,
+    ArrowLeftOutlined,
+} from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import dayjs from 'dayjs';
 import './styles.css';
@@ -39,6 +45,7 @@ const MonthChecker = () => {
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedCellInfo, setSelectedCellInfo] = useState(null);
     const { isSignedIn } = useAuth();
+    const navigate = useNavigate();
 
     const parseBookingDetails = (value, roomId, date) => {
         if (!value || value.trim() === '') {
@@ -402,6 +409,21 @@ const MonthChecker = () => {
 
     return (
         <div style={{ margin: '20px', maxWidth: '100%' }}>
+            <div style={{ marginBottom: 16 }}>
+                <Button
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => navigate('/')}
+                    type="text"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '4px 8px',
+                        color: '#1890ff',
+                    }}
+                >
+                    Về trang chủ
+                </Button>
+            </div>
             <Title level={3}>
                 <CalendarOutlined
                     style={{ marginRight: 8, color: '#1890ff' }}

@@ -14,7 +14,9 @@ import {
     DeleteOutlined,
     ExclamationCircleOutlined,
     CheckCircleOutlined,
+    ArrowLeftOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import './styles.css';
 
@@ -41,6 +43,7 @@ const RemoveBooking = () => {
     const [currentBooking, setCurrentBooking] = useState(null);
     const [bookingFound, setBookingFound] = useState(false);
     const { isSignedIn } = useAuth();
+    const navigate = useNavigate();
 
     // Function to convert column index to Excel column letter(s)
     const getColumnLetter = (columnIndex) => {
@@ -244,6 +247,21 @@ const RemoveBooking = () => {
 
     return (
         <div style={{ maxWidth: 600, margin: '40px auto', padding: '0 20px' }}>
+            <div style={{ marginBottom: 16 }}>
+                <Button
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => navigate('/')}
+                    type="text"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '4px 8px',
+                        color: '#1890ff',
+                    }}
+                >
+                    Về trang chủ
+                </Button>
+            </div>
             <Title level={3}>
                 <DeleteOutlined style={{ marginRight: 8, color: '#ff4d4f' }} />
                 Xóa đặt phòng

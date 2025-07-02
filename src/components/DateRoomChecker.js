@@ -13,7 +13,9 @@ import {
     CheckCircleOutlined,
     CloseCircleOutlined,
     CalendarOutlined,
+    ArrowLeftOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import './styles.css';
 
@@ -39,6 +41,7 @@ const DateRoomChecker = () => {
     const [roomStatuses, setRoomStatuses] = useState([]);
     const [selectedDate, setSelectedDate] = useState(null);
     const { isSignedIn } = useAuth();
+    const navigate = useNavigate();
 
     const checkRoomsForDate = async ({ date }) => {
         // Try multiple date formats to match the spreadsheet headers
@@ -195,6 +198,21 @@ const DateRoomChecker = () => {
 
     return (
         <div style={{ maxWidth: 800, margin: '40px auto', padding: '0 20px' }}>
+            <div style={{ marginBottom: 16 }}>
+                <Button
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => navigate('/')}
+                    type="text"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '4px 8px',
+                        color: '#1890ff',
+                    }}
+                >
+                    Về trang chủ
+                </Button>
+            </div>
             <Title level={3}>📅 Kiểm tra phòng trống trong ngày</Title>
 
             {!isSignedIn && (

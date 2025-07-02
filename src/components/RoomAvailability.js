@@ -1,13 +1,7 @@
 import { useState } from 'react';
-import {
-    Form,
-    Input,
-    Button,
-    Typography,
-    Select,
-    message,
-    DatePicker,
-} from 'antd';
+import { Form, Button, Typography, Select, message, DatePicker } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 
 const { Title } = Typography;
@@ -31,6 +25,7 @@ const RoomAvailability = () => {
     const [result, setResult] = useState('');
     const [loading, setLoading] = useState(false);
     const { isSignedIn, apiInitialized } = useAuth();
+    const navigate = useNavigate();
 
     const onFinish = async ({ date, roomId }) => {
         if (!apiInitialized) {
@@ -113,6 +108,21 @@ const RoomAvailability = () => {
 
     return (
         <div style={{ maxWidth: 500, margin: '40px auto' }}>
+            <div style={{ marginBottom: 16 }}>
+                <Button
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => navigate('/')}
+                    type="text"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '4px 8px',
+                        color: '#1890ff',
+                    }}
+                >
+                    Về trang chủ
+                </Button>
+            </div>
             <Title level={3}>📅 Kiểm tra tình trạng phòng</Title>
 
             {!isSignedIn ? (
