@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Form, Input, Button, message, Typography, Modal, Select } from 'antd';
+import {
+    Form,
+    Input,
+    Button,
+    message,
+    Typography,
+    Modal,
+    Select,
+    Flex,
+    DatePicker,
+} from 'antd';
+import dayjs from 'dayjs';
 
+import './styles.css';
 const { Title } = Typography;
 
 const CLIENT_ID =
@@ -123,6 +135,8 @@ const Booking = () => {
         });
 
     const onFinish = async ({ date, roomId, name, value, price }) => {
+        const formattedDate = date.format('DD/MM/YYYY'); // e.g., '01/05/2025'
+
         try {
             if (!isSignedIn) {
                 message.error('Please sign in first');
@@ -137,7 +151,7 @@ const Booking = () => {
 
             const data = readRes.result.values;
             const headers = data[0];
-            const dateIndex = headers.indexOf(date);
+            const dateIndex = headers.indexOf(formattedDate);
             const roomRowIndex = data.findIndex((row) => row[1] === roomId);
 
             if (dateIndex === -1 || roomRowIndex === -1) {
@@ -177,51 +191,80 @@ const Booking = () => {
         }
     };
 
+    const roomOptions = [
+        { value: '1001', label: '1001 - Bungalow Lớn' },
+        { value: '1002', label: '1002 - Bungalow Nhỏ 1' },
+        { value: '1003', label: '1003 - Bungalow Nhỏ 2' },
+        { value: '1004', label: '1004 - Phòng Nhỏ' },
+        { value: '1005', label: '1005 - Phòng Lớn 1' },
+        { value: '1006', label: '1006 - Phòng Lớn 2' },
+    ];
+
     return (
-        <div style={{ maxWidth: 500, margin: '40px auto' }}>
-            <Title level={3}>Update Booking for Room</Title>
+        <div className="booking-container">
+            <Title level={3} className="booking-title">
+                Update Booking for Room
+            </Title>
 
             {!isSignedIn ? (
-                <Button
-                    type="primary"
-                    onClick={handleLogin}
-                    style={{ marginBottom: 16 }}
-                >
-                    Sign in with Google
-                </Button>
+                <Flex justify="center">
+                    <Button
+                        type="primary"
+                        onClick={handleLogin}
+                        className="booking-button"
+                    >
+                        Sign in with Google
+                    </Button>
+                </Flex>
             ) : (
-                <div style={{ marginBottom: 16 }}>
-                    <Button onClick={handleLogout} style={{ marginRight: 8 }}>
+                <div className="signed-in-bar">
+                    <Button onClick={handleLogout} className="booking-button">
                         Sign out
                     </Button>
-                    <span style={{ color: 'green' }}>
+                    <span className="signed-in-text">
                         ✓ Signed in with Google
                     </span>
                 </div>
             )}
 
-            <Form form={form} layout="vertical" onFinish={onFinish}>
+            <Form
+                form={form}
+                layout="vertical"
+                onFinish={onFinish}
+                className="booking-form"
+            >
                 <Form.Item
                     name="roomId"
-                    label="Room ID"
+                    label="Số phòng"
                     rules={[
-                        { required: true, message: 'Please enter Room ID' },
+                        { required: true, message: 'Please select a Room ID' },
                     ]}
                 >
-                    <Input placeholder="e.g. 1001" />
+                    <Select placeholder="Select a room" size="large">
+                        {roomOptions.map((room) => (
+                            <Select.Option key={room.value} value={room.value}>
+                                {room.label}
+                            </Select.Option>
+                        ))}
+                    </Select>
                 </Form.Item>
 
                 <Form.Item
                     name="date"
-                    label="Date (column header)"
+                    label="Ngày đặt phòng"
                     rules={[
                         {
                             required: true,
-                            message: 'Please enter a date like 1/5',
+                            message: 'Vui lòng chọn ngày đặt phòng',
                         },
                     ]}
                 >
-                    <Input placeholder="e.g. 1/5" />
+                    <DatePicker
+                        format="DD/MM/YYYY"
+                        placeholder="Chọn ngày"
+                        size="large"
+                        style={{ width: '100%' }}
+                    />
                 </Form.Item>
 
                 <Form.Item
@@ -229,7 +272,7 @@ const Booking = () => {
                     label="Tên khách hàng"
                     rules={[{ required: true, message: 'Please enter name' }]}
                 >
-                    <Input placeholder="e.g. mh" />
+                    <Input placeholder="e.g. mh" size="large" />
                 </Form.Item>
 
                 <Form.Item
@@ -252,6 +295,7 @@ const Booking = () => {
                                 value: 'Đang đợi đặt cọc',
                             },
                         ]}
+                        size="large"
                     />
                 </Form.Item>
 
@@ -266,7 +310,7 @@ const Booking = () => {
                             },
                         ]}
                     >
-                        <Input placeholder="e.g. 500" />
+                        <Input placeholder="e.g. 500" size="large" />
                     </Form.Item>
                 )}
 
@@ -275,6 +319,9 @@ const Booking = () => {
                         type="primary"
                         htmlType="submit"
                         disabled={!isSignedIn}
+                        className="booking-button"
+                        size="large"
+                        block
                     >
                         Update Cell
                     </Button>
