@@ -16,7 +16,6 @@ import {
     ArrowLeftOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
 import './styles.css';
 
 const { Title, Text } = Typography;
@@ -40,7 +39,6 @@ const DateRoomChecker = () => {
     const [loading, setLoading] = useState(false);
     const [roomStatuses, setRoomStatuses] = useState([]);
     const [selectedDate, setSelectedDate] = useState(null);
-    const { isSignedIn } = useAuth();
     const navigate = useNavigate();
 
     const checkRoomsForDate = async ({ date }) => {
@@ -60,11 +58,6 @@ const DateRoomChecker = () => {
         setRoomStatuses([]);
 
         try {
-            if (!isSignedIn) {
-                message.error('Vui lòng đăng nhập trước');
-                return;
-            }
-
             const readRes =
                 await window.gapi.client.sheets.spreadsheets.values.get({
                     spreadsheetId: SPREADSHEET_ID,
@@ -197,71 +190,49 @@ const DateRoomChecker = () => {
     const occupiedRooms = roomStatuses.filter((room) => !room.available);
 
     return (
-        <div style={{ maxWidth: 800, margin: '40px auto', padding: '0 20px' }}>
-            <div style={{ marginBottom: 16 }}>
-                <Button
-                    icon={<ArrowLeftOutlined />}
-                    onClick={() => navigate('/')}
-                    type="text"
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '4px 8px',
-                        color: '#1890ff',
-                    }}
-                >
-                    Về trang chủ
-                </Button>
-            </div>
+        <div className="content-container">
+            <Button
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate('/')}
+                type="text"
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px 8px',
+                    color: '#1890ff',
+                }}
+            >
+                Về trang chủ
+            </Button>
             <Title level={3}>📅 Kiểm tra phòng trống trong ngày</Title>
 
-            {!isSignedIn && (
-                <Card style={{ marginBottom: 16, textAlign: 'center' }}>
-                    <Text type="warning">
-                        Vui lòng đăng nhập để sử dụng chức năng này
-                    </Text>
-                </Card>
-            )}
-
-            <Card style={{ marginBottom: 24 }}>
-                <Form
-                    form={form}
-                    layout="vertical"
-                    onFinish={checkRoomsForDate}
+            <Form form={form} layout="vertical" onFinish={checkRoomsForDate}>
+                <Form.Item
+                    name="date"
+                    label="Chọn ngày kiểm tra"
+                    rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}
                 >
-                    <Form.Item
-                        name="date"
-                        label="Chọn ngày kiểm tra"
-                        rules={[
-                            { required: true, message: 'Vui lòng chọn ngày' },
-                        ]}
-                    >
-                        <DatePicker
-                            format="DD/MM/YYYY"
-                            placeholder="Chọn ngày"
-                            size="large"
-                            style={{ width: '100%' }}
-                            disabled={!isSignedIn}
-                        />
-                    </Form.Item>
+                    <DatePicker
+                        format="DD/MM/YYYY"
+                        placeholder="Chọn ngày"
+                        size="large"
+                        style={{ width: '100%' }}
+                    />
+                </Form.Item>
 
-                    <Form.Item>
-                        <Button
-                            type="primary"
-                            htmlType="submit"
-                            size="large"
-                            block
-                            loading={loading}
-                            disabled={!isSignedIn}
-                            icon={<CalendarOutlined />}
-                        >
-                            {loading
-                                ? 'Đang kiểm tra...'
-                                : 'Kiểm tra tất cả phòng'}
-                        </Button>
-                    </Form.Item>
-                </Form>
-            </Card>
+                <Form.Item>
+                    <Button
+                        type="primary"
+                        htmlType="submit"
+                        size="large"
+                        block
+                        loading={loading}
+                        icon={<CalendarOutlined />}
+                    >
+                        {loading ? 'Đang kiểm tra...' : 'Kiểm tra tất cả phòng'}
+                    </Button>
+                </Form.Item>
+            </Form>
 
             {roomStatuses.length > 0 && (
                 <>

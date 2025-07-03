@@ -13,7 +13,6 @@ import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import { useAuth } from '../App';
 import './styles.css';
 
 // Extend dayjs with the isSameOrBefore plugin
@@ -29,7 +28,6 @@ const SHEET_NAME = 'Sheet1';
 const Booking = () => {
     const [form] = Form.useForm();
     const [roomStatus, setRoomStatus] = useState(null);
-    const { isSignedIn } = useAuth();
     const navigate = useNavigate();
 
     // Function to convert column index to Excel column letter(s)
@@ -54,11 +52,6 @@ const Booking = () => {
         price,
     }) => {
         try {
-            if (!isSignedIn) {
-                message.error('Please sign in first');
-                return;
-            }
-
             if (!fromDate || !toDate) {
                 message.error('Vui lòng chọn cả ngày bắt đầu và ngày kết thúc');
                 return;
@@ -220,39 +213,23 @@ const Booking = () => {
     ];
 
     return (
-        <div className="booking-container">
-            <div style={{ marginBottom: 16 }}>
-                <Button
-                    icon={<ArrowLeftOutlined />}
-                    onClick={() => navigate('/')}
-                    type="text"
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '4px 8px',
-                        color: '#1890ff',
-                    }}
-                >
-                    Về trang chủ
-                </Button>
-            </div>
+        <div className="content-container">
+            <Button
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate('/')}
+                type="text"
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px 8px',
+                    color: '#1890ff',
+                }}
+            >
+                Về trang chủ
+            </Button>
             <Title level={3} className="booking-title">
-                Update Booking for Room
+                Đặt phòng
             </Title>
-
-            {!isSignedIn && (
-                <div
-                    style={{
-                        textAlign: 'center',
-                        padding: 40,
-                        background: '#f5f5f5',
-                        borderRadius: 8,
-                        marginBottom: 16,
-                    }}
-                >
-                    <p>Vui lòng đăng nhập để sử dụng chức năng này</p>
-                </div>
-            )}
 
             <Form
                 form={form}
@@ -267,7 +244,7 @@ const Booking = () => {
                         { required: true, message: 'Please select a Room ID' },
                     ]}
                 >
-                    <Select placeholder="Select a room" size="large">
+                    <Select placeholder="Chọn phòng cần đặt" size="large">
                         {roomOptions.map((room) => (
                             <Select.Option key={room.value} value={room.value}>
                                 {room.label}
@@ -363,12 +340,11 @@ const Booking = () => {
                     <Button
                         type="primary"
                         htmlType="submit"
-                        disabled={!isSignedIn}
                         className="booking-button"
                         size="large"
                         block
                     >
-                        Update Cell
+                        Đặt phòng
                     </Button>
                 </Form.Item>
             </Form>

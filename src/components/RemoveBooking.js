@@ -8,7 +8,6 @@ import {
     Card,
     message,
     Modal,
-    Alert,
 } from 'antd';
 import {
     DeleteOutlined,
@@ -17,8 +16,6 @@ import {
     ArrowLeftOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
-import './styles.css';
 
 const { Title, Text } = Typography;
 const { confirm } = Modal;
@@ -42,7 +39,6 @@ const RemoveBooking = () => {
     const [loading, setLoading] = useState(false);
     const [currentBooking, setCurrentBooking] = useState(null);
     const [bookingFound, setBookingFound] = useState(false);
-    const { isSignedIn } = useAuth();
     const navigate = useNavigate();
 
     // Function to convert column index to Excel column letter(s)
@@ -75,11 +71,6 @@ const RemoveBooking = () => {
         setBookingFound(false);
 
         try {
-            if (!isSignedIn) {
-                message.error('Vui lòng đăng nhập trước');
-                return;
-            }
-
             const readRes =
                 await window.gapi.client.sheets.spreadsheets.values.get({
                     spreadsheetId: SPREADSHEET_ID,
@@ -246,97 +237,69 @@ const RemoveBooking = () => {
     };
 
     return (
-        <div style={{ maxWidth: 600, margin: '40px auto', padding: '0 20px' }}>
-            <div style={{ marginBottom: 16 }}>
-                <Button
-                    icon={<ArrowLeftOutlined />}
-                    onClick={() => navigate('/')}
-                    type="text"
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '4px 8px',
-                        color: '#1890ff',
-                    }}
-                >
-                    Về trang chủ
-                </Button>
-            </div>
+        <div className="content-container">
+            <Button
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate('/')}
+                type="text"
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px 8px',
+                    color: '#1890ff',
+                }}
+            >
+                Về trang chủ
+            </Button>
             <Title level={3}>
                 <DeleteOutlined style={{ marginRight: 8, color: '#ff4d4f' }} />
                 Xóa đặt phòng
             </Title>
 
-            {!isSignedIn && (
-                <Alert
-                    message="Cần đăng nhập"
-                    description="Vui lòng đăng nhập để sử dụng chức năng này"
-                    type="warning"
-                    showIcon
-                    style={{ marginBottom: 16 }}
-                />
-            )}
-
-            <Card title="Tìm kiếm booking cần xóa" style={{ marginBottom: 16 }}>
-                <Form
-                    form={form}
-                    layout="vertical"
-                    onFinish={checkCurrentBooking}
+            <Form form={form} layout="vertical" onFinish={checkCurrentBooking}>
+                <Form.Item
+                    name="roomId"
+                    label="Phòng"
+                    rules={[{ required: true, message: 'Vui lòng chọn phòng' }]}
                 >
-                    <Form.Item
-                        name="roomId"
-                        label="Phòng"
-                        rules={[
-                            { required: true, message: 'Vui lòng chọn phòng' },
-                        ]}
+                    <Select
+                        placeholder="Chọn phòng cần xóa booking"
+                        size="large"
                     >
-                        <Select
-                            placeholder="Chọn phòng cần xóa booking"
-                            size="large"
-                            disabled={!isSignedIn}
-                        >
-                            {roomOptions.map((room) => (
-                                <Select.Option
-                                    key={room.value}
-                                    value={room.value}
-                                >
-                                    {room.label}
-                                </Select.Option>
-                            ))}
-                        </Select>
-                    </Form.Item>
+                        {roomOptions.map((room) => (
+                            <Select.Option key={room.value} value={room.value}>
+                                {room.label}
+                            </Select.Option>
+                        ))}
+                    </Select>
+                </Form.Item>
 
-                    <Form.Item
-                        name="date"
-                        label="Ngày đặt phòng"
-                        rules={[
-                            { required: true, message: 'Vui lòng chọn ngày' },
-                        ]}
+                <Form.Item
+                    name="date"
+                    label="Ngày đặt phòng"
+                    rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}
+                >
+                    <DatePicker
+                        format="DD/MM/YYYY"
+                        placeholder="Chọn ngày cần xóa booking"
+                        size="large"
+                        style={{ width: '100%' }}
+                    />
+                </Form.Item>
+
+                <Form.Item>
+                    <Button
+                        type="primary"
+                        htmlType="submit"
+                        size="large"
+                        block
+                        loading={loading}
+                        style={{ marginBottom: 8 }}
                     >
-                        <DatePicker
-                            format="DD/MM/YYYY"
-                            placeholder="Chọn ngày cần xóa booking"
-                            size="large"
-                            style={{ width: '100%' }}
-                            disabled={!isSignedIn}
-                        />
-                    </Form.Item>
-
-                    <Form.Item>
-                        <Button
-                            type="primary"
-                            htmlType="submit"
-                            size="large"
-                            block
-                            loading={loading}
-                            disabled={!isSignedIn}
-                            style={{ marginBottom: 8 }}
-                        >
-                            {loading ? 'Đang tìm kiếm...' : 'Tìm kiếm booking'}
-                        </Button>
-                    </Form.Item>
-                </Form>
-            </Card>
+                        {loading ? 'Đang tìm kiếm...' : 'Tìm kiếm booking'}
+                    </Button>
+                </Form.Item>
+            </Form>
 
             {bookingFound && currentBooking && (
                 <Card

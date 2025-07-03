@@ -5,7 +5,7 @@ import {
     Route,
     useNavigate,
 } from 'react-router-dom';
-import { Modal, Button, Typography, message, Spin } from 'antd';
+import { Modal, Button, Typography, message, Spin, Flex } from 'antd';
 import { GoogleOutlined } from '@ant-design/icons';
 import Booking from './components/Booking';
 import './App.css'; // import the stylesheet
@@ -38,6 +38,58 @@ export const useAuth = () => {
     return context;
 };
 
+// Helper functions for localStorage (outside component to avoid dependency issues)
+const saveAuthToStorage = (token, userInfo) => {
+    try {
+        localStorage.setItem('homestay_access_token', token);
+        localStorage.setItem('homestay_user', JSON.stringify(userInfo));
+        localStorage.setItem('homestay_login_time', Date.now().toString());
+    } catch (error) {
+        console.error('Failed to save auth to localStorage:', error);
+    }
+};
+
+const getAuthFromStorage = () => {
+    try {
+        const token = localStorage.getItem('homestay_access_token');
+        const userStr = localStorage.getItem('homestay_user');
+        const loginTime = localStorage.getItem('homestay_login_time');
+
+        if (!token || !userStr || !loginTime) {
+            return null;
+        }
+
+        // Check if token is older than 1 hour (3600000 ms)
+        const tokenAge = Date.now() - parseInt(loginTime);
+        const MAX_TOKEN_AGE = 60 * 60 * 1000; // 1 hour
+
+        if (tokenAge > MAX_TOKEN_AGE) {
+            clearAuthFromStorage();
+            return null;
+        }
+
+        return {
+            token,
+            user: JSON.parse(userStr),
+            loginTime: parseInt(loginTime),
+        };
+    } catch (error) {
+        console.error('Failed to get auth from localStorage:', error);
+        clearAuthFromStorage();
+        return null;
+    }
+};
+
+const clearAuthFromStorage = () => {
+    try {
+        localStorage.removeItem('homestay_access_token');
+        localStorage.removeItem('homestay_user');
+        localStorage.removeItem('homestay_login_time');
+    } catch (error) {
+        console.error('Failed to clear auth from localStorage:', error);
+    }
+};
+
 // Authentication Provider Component
 const AuthProvider = ({ children }) => {
     const [isSignedIn, setIsSignedIn] = useState(false);
@@ -51,6 +103,9 @@ const AuthProvider = ({ children }) => {
     useEffect(() => {
         const initializeGoogleServices = async () => {
             try {
+                // Check for stored authentication first
+                const storedAuth = getAuthFromStorage();
+
                 // Wait for both gapi and google to be available
                 await new Promise((resolve) => {
                     const checkLibraries = () => {
@@ -79,13 +134,28 @@ const AuthProvider = ({ children }) => {
                     });
                 });
 
-                // Check if user is already signed in
-                const token = window.gapi.client.getToken();
-                if (token) {
+                // Restore authentication if available
+                if (storedAuth) {
+                    // Set the access token for gapi requests
+                    window.gapi.client.setToken({
+                        access_token: storedAuth.token,
+                    });
+
+                    setAccessToken(storedAuth.token);
+                    setUser(storedAuth.user);
                     setIsSignedIn(true);
-                    setAccessToken(token.access_token);
+                    setShowLoginModal(false);
+                    console.log('Authentication restored from localStorage');
                 } else {
-                    setShowLoginModal(true);
+                    // Check if user is already signed in via gapi
+                    const token = window.gapi.client.getToken();
+                    if (token) {
+                        setIsSignedIn(true);
+                        setAccessToken(token.access_token);
+                        setShowLoginModal(false);
+                    } else {
+                        setShowLoginModal(true);
+                    }
                 }
 
                 console.log('Google services initialized successfully');
@@ -117,7 +187,15 @@ const AuthProvider = ({ children }) => {
                         'Access token received:',
                         response.access_token
                     );
+
+                    const userInfo = { email: 'user@gmail.com' }; // You can enhance this to get actual user info
+
+                    // Save to localStorage
+                    saveAuthToStorage(response.access_token, userInfo);
+
+                    // Update state
                     setAccessToken(response.access_token);
+                    setUser(userInfo);
                     setIsSignedIn(true);
                     setShowLoginModal(false);
                     message.success('Đăng nhập thành công!');
@@ -126,9 +204,6 @@ const AuthProvider = ({ children }) => {
                     window.gapi.client.setToken({
                         access_token: response.access_token,
                     });
-
-                    // Get user info if available
-                    setUser({ email: 'user@gmail.com' }); // You can enhance this to get actual user info
                 },
             });
 
@@ -144,6 +219,11 @@ const AuthProvider = ({ children }) => {
             window.google.accounts.oauth2.revoke(accessToken);
         }
         window.gapi.client.setToken(null);
+
+        // Clear localStorage
+        clearAuthFromStorage();
+
+        // Clear state
         setAccessToken(null);
         setIsSignedIn(false);
         setUser(null);
@@ -233,7 +313,7 @@ const AuthProvider = ({ children }) => {
 
 const Home = () => {
     const navigate = useNavigate();
-    const { isSignedIn, user, handleLogout, isLoading } = useAuth();
+    const { isSignedIn, handleLogout, isLoading } = useAuth();
 
     if (isLoading) {
         return (
@@ -268,24 +348,13 @@ const Home = () => {
     }
 
     return (
-        <div className="home-container">
-            <div
-                style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: 20,
-                }}
-            >
-                <h2 className="home-heading">
-                    🏠 Home - Select a Functionality
-                </h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <Button size="small" onClick={handleLogout}>
-                        Đăng xuất
-                    </Button>
-                </div>
-            </div>
+        <Flex
+            vertical
+            gap={40}
+            align="center"
+            className="home-container content-container"
+        >
+            <h2 className="home-heading">Quản lý Homestay</h2>
 
             <div className="button-group">
                 <button
@@ -319,7 +388,10 @@ const Home = () => {
                     ⚙️ Xóa đặt phòng
                 </button>
             </div>
-        </div>
+            <Button size="big" onClick={handleLogout}>
+                Đăng xuất
+            </Button>
+        </Flex>
     );
 };
 

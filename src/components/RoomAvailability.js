@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Form, Button, Typography, Select, message, DatePicker } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
 
 const { Title } = Typography;
 
@@ -24,22 +23,9 @@ const RoomAvailability = () => {
     const [form] = Form.useForm();
     const [result, setResult] = useState('');
     const [loading, setLoading] = useState(false);
-    const { isSignedIn, apiInitialized } = useAuth();
     const navigate = useNavigate();
 
     const onFinish = async ({ date, roomId }) => {
-        if (!apiInitialized) {
-            message.error(
-                'Google API is still initializing. Please wait a moment.'
-            );
-            return;
-        }
-
-        if (!isSignedIn) {
-            message.error('Please sign in first to check room availability');
-            return;
-        }
-
         if (!window.gapi || !window.gapi.client || !window.gapi.client.sheets) {
             message.error('Google Sheets API is not initialized');
             return;
@@ -107,50 +93,21 @@ const RoomAvailability = () => {
     };
 
     return (
-        <div style={{ maxWidth: 500, margin: '40px auto' }}>
-            <div style={{ marginBottom: 16 }}>
-                <Button
-                    icon={<ArrowLeftOutlined />}
-                    onClick={() => navigate('/')}
-                    type="text"
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '4px 8px',
-                        color: '#1890ff',
-                    }}
-                >
-                    Về trang chủ
-                </Button>
-            </div>
+        <div className="content-container">
+            <Button
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate('/')}
+                type="text"
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px 8px',
+                    color: '#1890ff',
+                }}
+            >
+                Về trang chủ
+            </Button>
             <Title level={3}>📅 Kiểm tra tình trạng phòng</Title>
-
-            {!isSignedIn ? (
-                <div
-                    style={{
-                        textAlign: 'center',
-                        padding: 40,
-                        background: '#f5f5f5',
-                        borderRadius: 8,
-                        marginBottom: 16,
-                    }}
-                >
-                    <p>Vui lòng đăng nhập để sử dụng chức năng này</p>
-                </div>
-            ) : (
-                <div
-                    style={{
-                        marginBottom: 16,
-                        padding: 12,
-                        background: '#f6ffed',
-                        border: '1px solid #b7eb8f',
-                        borderRadius: 6,
-                        textAlign: 'center',
-                    }}
-                >
-                    ✓ Đã kết nối với Google Sheets
-                </div>
-            )}
 
             <Form form={form} layout="vertical" onFinish={onFinish}>
                 <Form.Item
@@ -158,11 +115,7 @@ const RoomAvailability = () => {
                     label="Phòng"
                     rules={[{ required: true, message: 'Chọn phòng' }]}
                 >
-                    <Select
-                        placeholder="Chọn phòng"
-                        size="large"
-                        disabled={!isSignedIn}
-                    >
+                    <Select placeholder="Chọn phòng" size="large">
                         {roomOptions.map((room) => (
                             <Select.Option key={room.value} value={room.value}>
                                 {room.label}
@@ -191,7 +144,6 @@ const RoomAvailability = () => {
                         htmlType="submit"
                         size="large"
                         block
-                        disabled={!isSignedIn}
                         loading={loading}
                     >
                         {loading ? 'Đang kiểm tra...' : 'Kiểm tra'}
