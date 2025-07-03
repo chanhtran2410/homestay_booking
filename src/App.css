@@ -9,7 +9,6 @@ body {
 
 /* Home Container */
 .home-container {
-  max-width: 860px;
   transition: all 0.3s ease;
 }
 
