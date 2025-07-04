@@ -16,6 +16,7 @@ import {
     ArrowLeftOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../App';
 
 const { Title, Text } = Typography;
 const { confirm } = Modal;
@@ -40,6 +41,7 @@ const RemoveBooking = () => {
     const [currentBooking, setCurrentBooking] = useState(null);
     const [bookingFound, setBookingFound] = useState(false);
     const navigate = useNavigate();
+    const { makeApiCall } = useAuth();
 
     // Function to convert column index to Excel column letter(s)
     const getColumnLetter = (columnIndex) => {

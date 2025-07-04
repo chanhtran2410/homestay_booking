@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import React, { useState, memo, useMemo, useCallback } from 'react';
 import {
     Form,
     Input,
+    InputNumber,
     Button,
     message,
     Typography,
@@ -13,6 +14,7 @@ import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import { useAuth } from '../App';
 import './styles.css';
 
 // Extend dayjs with the isSameOrBefore plugin
@@ -25,13 +27,14 @@ const SPREADSHEET_ID =
     '1re26jyCc2_gebIn5BRW7DTHAR6QmFTB7k5iSC3UhRrc';
 const SHEET_NAME = 'Sheet1';
 
-const Booking = () => {
+const Booking = memo(() => {
     const [form] = Form.useForm();
     const [roomStatus, setRoomStatus] = useState(null);
     const navigate = useNavigate();
+    const { makeApiCall } = useAuth();
 
-    // Function to convert column index to Excel column letter(s)
-    const getColumnLetter = (columnIndex) => {
+    // Function to convert column index to Excel column letter(s) - memoized
+    const getColumnLetter = useCallback((columnIndex) => {
         let result = '';
         let index = columnIndex;
 
@@ -41,182 +44,212 @@ const Booking = () => {
         }
 
         return result;
-    };
+    }, []);
 
-    const onFinish = async ({
-        fromDate,
-        toDate,
-        roomId,
-        name,
-        value,
-        price,
-    }) => {
-        try {
-            if (!fromDate || !toDate) {
-                message.error('Vui lòng chọn cả ngày bắt đầu và ngày kết thúc');
-                return;
-            }
-
-            if (toDate.isBefore(fromDate)) {
-                message.error('Ngày kết thúc phải sau ngày bắt đầu');
-                return;
-            }
-
-            // Generate array of dates from fromDate to toDate
-            const dateRange = [];
-            let currentDate = fromDate.clone();
-            while (currentDate.isSameOrBefore(toDate)) {
-                dateRange.push(currentDate.format('DD/MM/YYYY'));
-                currentDate = currentDate.add(1, 'day');
-            }
-
-            message.info(
-                `Đang cập nhật ${dateRange.length} ngày: ${dateRange.join(
-                    ', '
-                )}`
-            );
-
-            const readRes =
-                await window.gapi.client.sheets.spreadsheets.values.get({
-                    spreadsheetId: SPREADSHEET_ID,
-                    range: `${SHEET_NAME}`,
-                });
-
-            const data = readRes.result.values;
-            const headers = data[0];
-
-            const roomRowIndex = data.findIndex(
-                (row) => row && row[1] === roomId
-            );
-
-            if (roomRowIndex === -1) {
-                message.error(
-                    `Không tìm thấy phòng "${roomId}" trong bảng tính`
-                );
-                return;
-            }
-
-            // Check which dates exist in the sheet
-            const validDates = [];
-            const invalidDates = [];
-            const datesToUpdate = [];
-
-            for (const formattedDate of dateRange) {
-                const dateIndex = headers.indexOf(formattedDate);
-                if (dateIndex === -1) {
-                    invalidDates.push(formattedDate);
-                } else {
-                    validDates.push(formattedDate);
-                    const currentValue =
-                        data?.[roomRowIndex]?.[dateIndex] || '';
-                    datesToUpdate.push({
-                        date: formattedDate,
-                        dateIndex,
-                        currentValue,
-                        columnLetter: getColumnLetter(dateIndex),
-                        range: `${SHEET_NAME}!${getColumnLetter(dateIndex)}${
-                            roomRowIndex + 1
-                        }`,
-                    });
+    const onFinish = useCallback(
+        async ({ fromDate, numberOfNights, roomIds, name, value, price }) => {
+            try {
+                if (
+                    !fromDate ||
+                    !numberOfNights ||
+                    !roomIds ||
+                    roomIds.length === 0
+                ) {
+                    message.error(
+                        'Vui lòng chọn ngày nhận phòng, số đêm lưu trú và ít nhất một phòng'
+                    );
+                    return;
                 }
-            }
 
-            if (invalidDates.length > 0) {
-                message.warning(
-                    `Các ngày không tồn tại trong bảng tính sẽ bị bỏ qua: ${invalidDates.join(
+                if (numberOfNights <= 0) {
+                    message.error('Số đêm lưu trú phải lớn hơn 0');
+                    return;
+                }
+
+                // Generate array of dates from fromDate for numberOfNights
+                const dateRange = [];
+                let currentDate = fromDate.clone();
+                for (let i = 0; i < numberOfNights; i++) {
+                    dateRange.push(currentDate.format('DD/MM/YYYY'));
+                    currentDate = currentDate.add(1, 'day');
+                }
+
+                const endDate = fromDate.clone().add(numberOfNights - 1, 'day');
+
+                message.info(
+                    `Đang cập nhật ${numberOfNights} đêm cho ${
+                        roomIds.length
+                    } phòng (${fromDate.format(
+                        'DD/MM/YYYY'
+                    )} - ${endDate.format('DD/MM/YYYY')}): ${dateRange.join(
                         ', '
                     )}`
                 );
-            }
 
-            if (datesToUpdate.length === 0) {
-                message.error('Không có ngày hợp lệ nào để cập nhật');
-                return;
-            }
+                const readRes = await makeApiCall(() =>
+                    window.gapi.client.sheets.spreadsheets.values.get({
+                        spreadsheetId: SPREADSHEET_ID,
+                        range: `${SHEET_NAME}`,
+                    })
+                );
 
-            // Check for existing values and ask for confirmation if needed
-            const existingValues = datesToUpdate.filter(
-                (item) => item.currentValue.trim() !== ''
-            );
-            if (existingValues.length > 0) {
-                const existingDates = existingValues
-                    .map((item) => item.date)
-                    .join(', ');
-                const confirmed = await new Promise((resolve) => {
-                    Modal.confirm({
-                        title: 'Có dữ liệu đã tồn tại',
-                        content: `Các ngày sau đã có dữ liệu: ${existingDates}. Bạn có chắc muốn ghi đè không?`,
-                        okText: 'Ghi đè tất cả',
-                        cancelText: 'Hủy',
-                        onOk: () => resolve(true),
-                        onCancel: () => resolve(false),
+                const data = readRes.result.values;
+                const headers = data[0];
+
+                // Process each room
+                const allDataToUpdate = [];
+                const invalidRooms = [];
+
+                for (const roomId of roomIds) {
+                    const roomRowIndex = data.findIndex(
+                        (row) => row && row[1] === roomId
+                    );
+
+                    if (roomRowIndex === -1) {
+                        invalidRooms.push(roomId);
+                        continue;
+                    }
+
+                    // Check which dates exist in the sheet for this room
+                    const validDates = [];
+                    const invalidDates = [];
+
+                    for (const formattedDate of dateRange) {
+                        const dateIndex = headers.indexOf(formattedDate);
+                        if (dateIndex === -1) {
+                            invalidDates.push(formattedDate);
+                        } else {
+                            validDates.push(formattedDate);
+                            const currentValue =
+                                data?.[roomRowIndex]?.[dateIndex] || '';
+                            allDataToUpdate.push({
+                                roomId,
+                                date: formattedDate,
+                                dateIndex,
+                                currentValue,
+                                roomRowIndex,
+                                columnLetter: getColumnLetter(dateIndex),
+                                range: `${SHEET_NAME}!${getColumnLetter(
+                                    dateIndex
+                                )}${roomRowIndex + 1}`,
+                            });
+                        }
+                    }
+
+                    if (invalidDates.length > 0) {
+                        message.warning(
+                            `Phòng ${roomId} - Các ngày không tồn tại trong bảng tính: ${invalidDates.join(
+                                ', '
+                            )}`
+                        );
+                    }
+                }
+
+                if (invalidRooms.length > 0) {
+                    message.error(
+                        `Không tìm thấy các phòng sau trong bảng tính: ${invalidRooms.join(
+                            ', '
+                        )}`
+                    );
+                }
+
+                if (allDataToUpdate.length === 0) {
+                    message.error('Không có dữ liệu hợp lệ nào để cập nhật');
+                    return;
+                }
+
+                // Check for existing values and ask for confirmation if needed
+                const existingValues = allDataToUpdate.filter(
+                    (item) => item.currentValue.trim() !== ''
+                );
+                if (existingValues.length > 0) {
+                    const existingInfo = existingValues
+                        .map((item) => `${item.roomId}: ${item.date}`)
+                        .join(', ');
+                    const confirmed = await new Promise((resolve) => {
+                        Modal.confirm({
+                            title: 'Có dữ liệu đã tồn tại',
+                            content: `Các phòng và ngày sau đã có dữ liệu: ${existingInfo}. Bạn có chắc muốn ghi đè không?`,
+                            okText: 'Ghi đè tất cả',
+                            cancelText: 'Hủy',
+                            onOk: () => resolve(true),
+                            onCancel: () => resolve(false),
+                        });
                     });
-                });
-                if (!confirmed) return;
-            }
+                    if (!confirmed) return;
+                }
 
-            // Prepare batch update data
-            const composedValue = `${name} - ${value}${
-                value === 'Đã đặt cọc' && price ? ` - ${price}` : ''
-            }`;
+                // Prepare batch update data
+                const composedValue = `${name} - ${value}${
+                    value === 'Đã đặt cọc' && price ? ` - ${price}` : ''
+                }`;
 
-            const batchUpdateData = {
-                requests: datesToUpdate.map((item) => ({
-                    updateCells: {
-                        range: {
-                            sheetId: 0, // Assuming first sheet
-                            startRowIndex: roomRowIndex,
-                            endRowIndex: roomRowIndex + 1,
-                            startColumnIndex: item.dateIndex,
-                            endColumnIndex: item.dateIndex + 1,
-                        },
-                        rows: [
-                            {
-                                values: [
-                                    {
-                                        userEnteredValue: {
-                                            stringValue: composedValue,
-                                        },
-                                    },
-                                ],
+                const batchUpdateData = {
+                    requests: allDataToUpdate.map((item) => ({
+                        updateCells: {
+                            range: {
+                                sheetId: 0, // Assuming first sheet
+                                startRowIndex: item.roomRowIndex,
+                                endRowIndex: item.roomRowIndex + 1,
+                                startColumnIndex: item.dateIndex,
+                                endColumnIndex: item.dateIndex + 1,
                             },
-                        ],
-                        fields: 'userEnteredValue',
-                    },
-                })),
-            };
+                            rows: [
+                                {
+                                    values: [
+                                        {
+                                            userEnteredValue: {
+                                                stringValue: composedValue,
+                                            },
+                                        },
+                                    ],
+                                },
+                            ],
+                            fields: 'userEnteredValue',
+                        },
+                    })),
+                };
 
-            // Execute batch update
-            await window.gapi.client.sheets.spreadsheets.batchUpdate({
-                spreadsheetId: SPREADSHEET_ID,
-                resource: batchUpdateData,
-            });
+                // Execute batch update
+                await makeApiCall(() =>
+                    window.gapi.client.sheets.spreadsheets.batchUpdate({
+                        spreadsheetId: SPREADSHEET_ID,
+                        resource: batchUpdateData,
+                    })
+                );
 
-            message.success(
-                `Đã cập nhật thành công ${datesToUpdate.length} ngày cho phòng ${roomId}!`
-            );
-            form.resetFields();
-            setRoomStatus(null);
-        } catch (error) {
-            console.error('Sheet update failed:', error);
-            message.error('Failed to update sheet');
-        }
-    };
+                message.success(
+                    `Đã đặt phòng thành công ${numberOfNights} đêm cho ${roomIds.length} phòng! (${allDataToUpdate.length} ô đã cập nhật)`
+                );
+                form.resetFields();
+                setRoomStatus(null);
+            } catch (error) {
+                console.error('Sheet update failed:', error);
+                message.error('Failed to update sheet');
+            }
+        },
+        [makeApiCall, getColumnLetter, form]
+    );
 
-    const roomOptions = [
-        { value: '1001', label: '1001 - Bungalow Lớn' },
-        { value: '1002', label: '1002 - Bungalow Nhỏ 1' },
-        { value: '1003', label: '1003 - Bungalow Nhỏ 2' },
-        { value: '1004', label: '1004 - Phòng Nhỏ' },
-        { value: '1005', label: '1005 - Phòng Lớn 1' },
-        { value: '1006', label: '1006 - Phòng Lớn 2' },
-    ];
+    const roomOptions = useMemo(
+        () => [
+            { value: '1001', label: '1001 - Bungalow Lớn' },
+            { value: '1002', label: '1002 - Bungalow Nhỏ 1' },
+            { value: '1003', label: '1003 - Bungalow Nhỏ 2' },
+            { value: '1004', label: '1004 - Phòng Nhỏ' },
+            { value: '1005', label: '1005 - Phòng Lớn 1' },
+            { value: '1006', label: '1006 - Phòng Lớn 2' },
+        ],
+        []
+    );
+
+    const handleNavigateHome = useCallback(() => navigate('/'), [navigate]);
 
     return (
         <div className="content-container">
             <Button
                 icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/')}
+                onClick={handleNavigateHome}
                 type="text"
                 style={{
                     display: 'flex',
@@ -238,13 +271,21 @@ const Booking = () => {
                 className="booking-form"
             >
                 <Form.Item
-                    name="roomId"
-                    label="Số phòng"
+                    name="roomIds"
+                    label="Phòng cần đặt (có thể chọn nhiều)"
                     rules={[
-                        { required: true, message: 'Please select a Room ID' },
+                        {
+                            required: true,
+                            message: 'Vui lòng chọn ít nhất một phòng',
+                        },
                     ]}
                 >
-                    <Select placeholder="Chọn phòng cần đặt" size="large">
+                    <Select
+                        mode="multiple"
+                        placeholder="Chọn phòng cần đặt (có thể chọn nhiều)"
+                        size="large"
+                        maxTagCount="responsive"
+                    >
                         {roomOptions.map((room) => (
                             <Select.Option key={room.value} value={room.value}>
                                 {room.label}
@@ -255,36 +296,43 @@ const Booking = () => {
 
                 <Form.Item
                     name="fromDate"
-                    label="Ngày bắt đầu"
+                    label="Ngày nhận phòng"
                     rules={[
                         {
                             required: true,
-                            message: 'Vui lòng chọn ngày bắt đầu',
+                            message: 'Vui lòng chọn ngày nhận phòng',
                         },
                     ]}
                 >
                     <DatePicker
                         format="DD/MM/YYYY"
-                        placeholder="Chọn ngày bắt đầu"
+                        placeholder="Chọn ngày nhận phòng"
                         size="large"
                         style={{ width: '100%' }}
                     />
                 </Form.Item>
 
                 <Form.Item
-                    name="toDate"
-                    label="Ngày kết thúc"
+                    name="numberOfNights"
+                    label="Số đêm lưu trú"
                     rules={[
                         {
                             required: true,
-                            message: 'Vui lòng chọn ngày kết thúc',
+                            message: 'Vui lòng nhập số đêm lưu trú',
+                        },
+                        {
+                            type: 'number',
+                            min: 1,
+                            max: 30,
+                            message: 'Số đêm phải từ 1 đến 30',
                         },
                     ]}
                 >
-                    <DatePicker
-                        format="DD/MM/YYYY"
-                        placeholder="Chọn ngày kết thúc"
+                    <InputNumber
+                        placeholder="Ví dụ: 3"
                         size="large"
+                        min={1}
+                        max={30}
                         style={{ width: '100%' }}
                     />
                 </Form.Item>
@@ -344,12 +392,12 @@ const Booking = () => {
                         size="large"
                         block
                     >
-                        Đặt phòng
+                        Xác nhận đặt phòng
                     </Button>
                 </Form.Item>
             </Form>
         </div>
     );
-};
+});
 
 export default Booking;

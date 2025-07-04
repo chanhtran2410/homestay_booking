@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, {
+    createContext,
+    useContext,
+    useState,
+    useEffect,
+    memo,
+    useMemo,
+    useCallback,
+} from 'react';
 import {
     BrowserRouter as Router,
     Routes,
@@ -171,7 +179,7 @@ const AuthProvider = ({ children }) => {
         initializeGoogleServices();
     }, []);
 
-    const handleLogin = async () => {
+    const handleLogin = useCallback(async () => {
         try {
             const tokenClient = window.google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
@@ -212,9 +220,9 @@ const AuthProvider = ({ children }) => {
             console.error('Login failed:', error);
             message.error('Đăng nhập thất bại. Vui lòng thử lại.');
         }
-    };
+    }, []);
 
-    const handleLogout = () => {
+    const handleLogout = useCallback(() => {
         if (accessToken) {
             window.google.accounts.oauth2.revoke(accessToken);
         }
@@ -229,17 +237,108 @@ const AuthProvider = ({ children }) => {
         setUser(null);
         setShowLoginModal(true);
         message.success('Đăng xuất thành công');
-    };
+    }, [accessToken]);
 
-    const value = {
-        isSignedIn,
-        user,
-        accessToken,
-        apiInitialized,
-        handleLogin,
-        handleLogout,
-        isLoading,
-    };
+    // Function to handle token expiration and force re-login
+    const handleTokenExpiration = useCallback(() => {
+        console.warn('Token expired or invalid, forcing re-login');
+
+        // Clear stored authentication
+        clearAuthFromStorage();
+        window.gapi.client.setToken(null);
+
+        // Clear state
+        setAccessToken(null);
+        setIsSignedIn(false);
+        setUser(null);
+        setShowLoginModal(true);
+
+        message.warning('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }, []);
+
+    // Centralized API call wrapper with token expiration handling
+    const makeApiCall = useCallback(
+        async (apiCallFunction) => {
+            if (!apiInitialized || !isSignedIn || !accessToken) {
+                throw new Error('Not authenticated or API not initialized');
+            }
+
+            try {
+                return await apiCallFunction();
+            } catch (error) {
+                console.error('API call error:', error);
+
+                // Check for various token expiration indicators
+                const isTokenExpired =
+                    error.status === 401 ||
+                    error.status === 403 ||
+                    (error.result &&
+                        error.result.error &&
+                        (error.result.error.code === 401 ||
+                            error.result.error.code === 403 ||
+                            error.result.error.message?.includes(
+                                'Invalid Credentials'
+                            ) ||
+                            error.result.error.message?.includes(
+                                'Request had invalid credentials'
+                            ) ||
+                            error.result.error.message?.includes(
+                                'invalid_token'
+                            ) ||
+                            error.result.error.message?.includes(
+                                'token_expired'
+                            ))) ||
+                    (error.message &&
+                        (error.message.includes('Invalid Credentials') ||
+                            error.message.includes(
+                                'Request had invalid credentials'
+                            ) ||
+                            error.message.includes('invalid_token') ||
+                            error.message.includes('token_expired'))) ||
+                    (typeof error === 'string' &&
+                        (error.includes('Invalid Credentials') ||
+                            error.includes('Request had invalid credentials') ||
+                            error.includes('invalid_token') ||
+                            error.includes('token_expired')));
+
+                if (isTokenExpired) {
+                    handleTokenExpiration();
+                    throw new Error(
+                        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+                    );
+                }
+
+                // Re-throw the original error if it's not related to token expiration
+                throw error;
+            }
+        },
+        [apiInitialized, isSignedIn, accessToken, handleTokenExpiration]
+    );
+
+    const value = useMemo(
+        () => ({
+            isSignedIn,
+            user,
+            accessToken,
+            apiInitialized,
+            handleLogin,
+            handleLogout,
+            isLoading,
+            makeApiCall,
+            handleTokenExpiration,
+        }),
+        [
+            isSignedIn,
+            user,
+            accessToken,
+            apiInitialized,
+            handleLogin,
+            handleLogout,
+            isLoading,
+            makeApiCall,
+            handleTokenExpiration,
+        ]
+    );
 
     return (
         <AuthContext.Provider value={value}>
@@ -311,9 +410,30 @@ const AuthProvider = ({ children }) => {
     );
 };
 
-const Home = () => {
+const Home = memo(() => {
     const navigate = useNavigate();
     const { isSignedIn, handleLogout, isLoading } = useAuth();
+
+    const handleNavigateToBooking = useCallback(
+        () => navigate('/booking'),
+        [navigate]
+    );
+    const handleNavigateToAvailability = useCallback(
+        () => navigate('/availability'),
+        [navigate]
+    );
+    const handleNavigateToDateChecking = useCallback(
+        () => navigate('/date_checking'),
+        [navigate]
+    );
+    const handleNavigateToMonthChecking = useCallback(
+        () => navigate('/month-checking'),
+        [navigate]
+    );
+    const handleNavigateToRemoveBooking = useCallback(
+        () => navigate('/remove-booking'),
+        [navigate]
+    );
 
     if (isLoading) {
         return (
@@ -359,25 +479,25 @@ const Home = () => {
             <div className="button-group">
                 <button
                     className="nav-button"
-                    onClick={() => navigate('/booking')}
+                    onClick={handleNavigateToBooking}
                 >
                     📘 Đặt phòng
                 </button>
                 <button
                     className="nav-button"
-                    onClick={() => navigate('/availability')}
+                    onClick={handleNavigateToAvailability}
                 >
                     📅 Kiểm tra phòng
                 </button>
                 <button
                     className="nav-button"
-                    onClick={() => navigate('/date_checking')}
+                    onClick={handleNavigateToDateChecking}
                 >
                     📊 Kiểm tra phòng trống trong ngày
                 </button>
                 <button
                     className="nav-button"
-                    onClick={() => navigate('/month-checking')}
+                    onClick={handleNavigateToMonthChecking}
                 >
                     📊 Kiểm tra phòng trống trong tháng
                 </button>
@@ -393,7 +513,7 @@ const Home = () => {
             </Button>
         </Flex>
     );
-};
+});
 
 const App = () => {
     return (

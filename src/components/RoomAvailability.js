@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Form, Button, Typography, Select, message, DatePicker } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../App';
 
 const { Title } = Typography;
 
@@ -24,24 +25,21 @@ const RoomAvailability = () => {
     const [result, setResult] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { makeApiCall } = useAuth();
 
     const onFinish = async ({ date, roomId }) => {
-        if (!window.gapi || !window.gapi.client || !window.gapi.client.sheets) {
-            message.error('Google Sheets API is not initialized');
-            return;
-        }
-
         setLoading(true);
         setResult(''); // Clear previous result
 
         try {
             const formattedDate = date.format('DD/MM/YYYY');
 
-            const readRes =
-                await window.gapi.client.sheets.spreadsheets.values.get({
+            const readRes = await makeApiCall(() =>
+                window.gapi.client.sheets.spreadsheets.values.get({
                     spreadsheetId: SPREADSHEET_ID,
                     range: `${SHEET_NAME}`,
-                });
+                })
+            );
 
             const data = readRes.result.values;
 

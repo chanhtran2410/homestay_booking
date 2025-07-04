@@ -16,6 +16,7 @@ import {
     ArrowLeftOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../App';
 import './styles.css';
 
 const { Title, Text } = Typography;
@@ -40,6 +41,7 @@ const DateRoomChecker = () => {
     const [roomStatuses, setRoomStatuses] = useState([]);
     const [selectedDate, setSelectedDate] = useState(null);
     const navigate = useNavigate();
+    const { makeApiCall } = useAuth();
 
     const checkRoomsForDate = async ({ date }) => {
         // Try multiple date formats to match the spreadsheet headers
@@ -58,11 +60,12 @@ const DateRoomChecker = () => {
         setRoomStatuses([]);
 
         try {
-            const readRes =
-                await window.gapi.client.sheets.spreadsheets.values.get({
+            const readRes = await makeApiCall(() =>
+                window.gapi.client.sheets.spreadsheets.values.get({
                     spreadsheetId: SPREADSHEET_ID,
                     range: `${SHEET_NAME}`,
-                });
+                })
+            );
 
             const data = readRes.result.values;
 

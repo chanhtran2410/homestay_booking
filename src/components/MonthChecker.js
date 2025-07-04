@@ -48,6 +48,7 @@ const MonthChecker = () => {
     const navigate = useNavigate();
 
     const parseBookingDetails = (value, roomId, date) => {
+        console.log('value', value);
         if (!value || value.trim() === '') {
             return {
                 status: 'Trống',
@@ -83,15 +84,11 @@ const MonthChecker = () => {
         }
 
         // Extract customer name (usually the first part before the dash)
-        const parts = value.split(' - ');
+        const parts = value.split('-');
+        console.log('parts', parts);
         if (parts.length > 0) {
             customerName = parts[0].trim();
-        }
-
-        // Extract deposit amount (look for numbers)
-        const moneyMatch = value.match(/(\d+(?:\.\d+)?)/);
-        if (moneyMatch && statusType === 'confirmed') {
-            depositAmount = parseFloat(moneyMatch[1]);
+            depositAmount = parts[2].trim();
         }
 
         return {
