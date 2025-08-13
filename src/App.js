@@ -430,10 +430,10 @@ const Home = memo(() => {
         () => navigate('/month-checking'),
         [navigate]
     );
-    const handleNavigateToRemoveBooking = useCallback(
-        () => navigate('/remove-booking'),
-        [navigate]
-    );
+    // const handleNavigateToRemoveBooking = useCallback(
+    //     () => navigate('/remove-booking'),
+    //     [navigate]
+    // );
 
     if (isLoading) {
         return (

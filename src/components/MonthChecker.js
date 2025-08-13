@@ -48,7 +48,7 @@ const MonthChecker = () => {
     const navigate = useNavigate();
 
     const parseBookingDetails = (value, roomId, date) => {
-        console.log('value', value);
+        console.log('Parsing booking details:', { value, roomId, date });
         if (!value || value.trim() === '') {
             return {
                 status: 'Trống',
@@ -68,13 +68,17 @@ const MonthChecker = () => {
         // Determine status
         if (
             lowerValue.includes('đã đặt cọc') ||
-            lowerValue.includes('đã nhận cọc')
+            lowerValue.includes('đã nhận cọc') ||
+            lowerValue.includes('đã cọc')
         ) {
             status = 'Đã đặt cọc';
             statusType = 'confirmed';
         } else if (
             lowerValue.includes('đang đợi') ||
-            lowerValue.includes('chờ')
+            lowerValue.includes('chờ') ||
+            lowerValue.includes('pending') ||
+            lowerValue.includes('đợi cọc') ||
+            lowerValue.includes('chờ cọc')
         ) {
             status = 'Đang đợi đặt cọc';
             statusType = 'pending';
@@ -85,10 +89,13 @@ const MonthChecker = () => {
 
         // Extract customer name (usually the first part before the dash)
         const parts = value.split('-');
-        console.log('parts', parts);
+        console.log('Parsed parts:', parts);
+        console.log('Detected status:', status, 'statusType:', statusType);
         if (parts.length > 0) {
             customerName = parts[0].trim();
-            depositAmount = parts[2].trim();
+            if (parts.length > 2) {
+                depositAmount = parts[2].trim();
+            }
         }
 
         return {
@@ -123,12 +130,16 @@ const MonthChecker = () => {
         const lowerValue = value.toLowerCase();
         if (
             lowerValue.includes('đã đặt cọc') ||
-            lowerValue.includes('đã nhận cọc')
+            lowerValue.includes('đã nhận cọc') ||
+            lowerValue.includes('đã cọc')
         ) {
             return 'error'; // Red for confirmed bookings
         } else if (
             lowerValue.includes('đang đợi') ||
-            lowerValue.includes('chờ')
+            lowerValue.includes('chờ') ||
+            lowerValue.includes('pending') ||
+            lowerValue.includes('đợi cọc') ||
+            lowerValue.includes('chờ cọc')
         ) {
             return 'warning'; // Yellow for pending bookings
         } else {
@@ -148,12 +159,16 @@ const MonthChecker = () => {
         const lowerValue = value.toLowerCase();
         if (
             lowerValue.includes('đã đặt cọc') ||
-            lowerValue.includes('đã nhận cọc')
+            lowerValue.includes('đã nhận cọc') ||
+            lowerValue.includes('đã cọc')
         ) {
             return amount ? `Đã cọc (${amount})` : 'Đã cọc';
         } else if (
             lowerValue.includes('đang đợi') ||
-            lowerValue.includes('chờ')
+            lowerValue.includes('chờ') ||
+            lowerValue.includes('pending') ||
+            lowerValue.includes('đợi cọc') ||
+            lowerValue.includes('chờ cọc')
         ) {
             return 'Đang chờ cọc';
         } else {
@@ -373,7 +388,7 @@ const MonthChecker = () => {
         if (isSignedIn) {
             loadMonthData(selectedMonth);
         }
-    }, [isSignedIn, selectedMonth]);
+    }, [isSignedIn, selectedMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleMonthChange = (month) => {
         if (month) {
@@ -393,13 +408,19 @@ const MonthChecker = () => {
             const value = room[`day_${dateInfo.day}`];
             if (!value || value.trim() === '') {
                 availableCells++;
-            } else if (
-                value.toLowerCase().includes('đang đợi') ||
-                value.toLowerCase().includes('chờ')
-            ) {
-                pendingCells++;
             } else {
-                bookedCells++;
+                const lowerValue = value.toLowerCase();
+                if (
+                    lowerValue.includes('đang đợi') ||
+                    lowerValue.includes('chờ') ||
+                    lowerValue.includes('pending') ||
+                    lowerValue.includes('đợi cọc') ||
+                    lowerValue.includes('chờ cọc')
+                ) {
+                    pendingCells++;
+                } else {
+                    bookedCells++;
+                }
             }
         });
     });
