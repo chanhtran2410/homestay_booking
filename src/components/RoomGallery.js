@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     Card,
     Row,
@@ -34,20 +34,6 @@ const { Meta } = Card;
 const RoomGallery = () => {
     const [selectedRoom, setSelectedRoom] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
-
-    // Prevent background scrolling when modal is open
-    useEffect(() => {
-        if (modalVisible) {
-            document.body.classList.add('modal-open');
-        } else {
-            document.body.classList.remove('modal-open');
-        }
-
-        // Cleanup function to remove class when component unmounts
-        return () => {
-            document.body.classList.remove('modal-open');
-        };
-    }, [modalVisible]);
 
     const handleViewDetails = (room) => {
         setSelectedRoom(room);
@@ -306,7 +292,13 @@ const RoomGallery = () => {
                     <div className="modal-content">
                         {/* Room Images Carousel */}
                         <div className="modal-carousel">
-                            <Carousel autoplay effect="fade">
+                            <Carousel
+                                autoplay
+                                effect="fade"
+                                arrows={true}
+                                dots={true}
+                                infinite={true}
+                            >
                                 {selectedRoom.images.map((image, index) => (
                                     <div key={index}>
                                         <img
