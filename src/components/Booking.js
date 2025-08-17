@@ -1,4 +1,4 @@
-import React, { useState, memo, useMemo, useCallback } from 'react';
+import React, { useState, memo, useCallback } from 'react';
 import {
     Form,
     Input,
@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import { useAuth } from '../App';
+import { ROOM_OPTIONS } from '../constants/roomOptions';
 import './styles.css';
 
 // Extend dayjs with the isSameOrBefore plugin
@@ -231,18 +232,6 @@ const Booking = memo(() => {
         [makeApiCall, getColumnLetter, form]
     );
 
-    const roomOptions = useMemo(
-        () => [
-            { value: '1001', label: '1001 - Bungalow Lớn' },
-            { value: '1002', label: '1002 - Bungalow Nhỏ 1' },
-            { value: '1003', label: '1003 - Bungalow Nhỏ 2' },
-            { value: '1004', label: '1004 - Phòng Nhỏ' },
-            { value: '1005', label: '1005 - Phòng Lớn 1' },
-            { value: '1006', label: '1006 - Phòng Lớn 2' },
-        ],
-        []
-    );
-
     const handleNavigateHome = useCallback(() => navigate('/'), [navigate]);
 
     return (
@@ -286,7 +275,7 @@ const Booking = memo(() => {
                         size="large"
                         maxTagCount="responsive"
                     >
-                        {roomOptions.map((room) => (
+                        {ROOM_OPTIONS.map((room) => (
                             <Select.Option key={room.value} value={room.value}>
                                 {room.label}
                             </Select.Option>

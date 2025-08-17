@@ -21,6 +21,7 @@ import RoomAvailability from './components/RoomAvailability';
 import DateRoomChecker from './components/DateRoomChecker';
 import RemoveBooking from './components/RemoveBooking';
 import MonthChecker from './components/MonthChecker';
+import RoomGallery from './components/RoomGallery';
 
 const { Title, Text } = Typography;
 
@@ -479,6 +480,12 @@ const Home = memo(() => {
             <div className="button-group">
                 <button
                     className="nav-button"
+                    onClick={() => navigate('/rooms')}
+                >
+                    🏠 Xem phòng homestay
+                </button>
+                <button
+                    className="nav-button"
                     onClick={handleNavigateToBooking}
                 >
                     📘 Đặt phòng
@@ -517,36 +524,53 @@ const Home = memo(() => {
 
 const App = () => {
     return (
-        <AuthProvider>
-            <Router>
-                <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/booking" element={<Booking />} />
-                    <Route
-                        path="/availability"
-                        element={<RoomAvailability />}
-                    />
-                    <Route
-                        path="/date_checking"
-                        element={<DateRoomChecker />}
-                    />
-                    <Route path="/month-checking" element={<MonthChecker />} />
-                    <Route path="/remove-booking" element={<RemoveBooking />} />
-                    <Route
-                        path="/reports"
-                        element={<Placeholder title="Reports" />}
-                    />
-                    <Route
-                        path="/settings"
-                        element={<Placeholder title="Settings" />}
-                    />
-                    <Route
-                        path="/about"
-                        element={<Placeholder title="About" />}
-                    />
-                </Routes>
-            </Router>
-        </AuthProvider>
+        <Router>
+            <Routes>
+                {/* Public routes - no authentication required */}
+                <Route path="/rooms" element={<RoomGallery />} />
+
+                {/* Protected routes - authentication required */}
+                <Route
+                    path="/*"
+                    element={
+                        <AuthProvider>
+                            <Routes>
+                                <Route path="/" element={<Home />} />
+                                <Route path="/booking" element={<Booking />} />
+                                <Route
+                                    path="/availability"
+                                    element={<RoomAvailability />}
+                                />
+                                <Route
+                                    path="/date_checking"
+                                    element={<DateRoomChecker />}
+                                />
+                                <Route
+                                    path="/month-checking"
+                                    element={<MonthChecker />}
+                                />
+                                <Route
+                                    path="/remove-booking"
+                                    element={<RemoveBooking />}
+                                />
+                                <Route
+                                    path="/reports"
+                                    element={<Placeholder title="Reports" />}
+                                />
+                                <Route
+                                    path="/settings"
+                                    element={<Placeholder title="Settings" />}
+                                />
+                                <Route
+                                    path="/about"
+                                    element={<Placeholder title="About" />}
+                                />
+                            </Routes>
+                        </AuthProvider>
+                    }
+                />
+            </Routes>
+        </Router>
     );
 };
 

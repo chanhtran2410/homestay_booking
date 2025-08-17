@@ -16,6 +16,7 @@ import {
     ArrowLeftOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { ROOM_OPTIONS } from '../constants/roomOptions';
 // import { useAuth } from '../App';
 
 const { Title, Text } = Typography;
@@ -25,15 +26,6 @@ const SPREADSHEET_ID =
     process.env.REACT_APP_SPREADSHEET_ID ||
     '1re26jyCc2_gebIn5BRW7DTHAR6QmFTB7k5iSC3UhRrc';
 const SHEET_NAME = 'Sheet1';
-
-const roomOptions = [
-    { value: '1001', label: '1001 - Bungalow Lớn' },
-    { value: '1002', label: '1002 - Bungalow Nhỏ 1' },
-    { value: '1003', label: '1003 - Bungalow Nhỏ 2' },
-    { value: '1004', label: '1004 - Phòng Nhỏ' },
-    { value: '1005', label: '1005 - Phòng Lớn 1' },
-    { value: '1006', label: '1006 - Phòng Lớn 2' },
-];
 
 const RemoveBooking = () => {
     const [form] = Form.useForm();
@@ -139,7 +131,7 @@ const RemoveBooking = () => {
                     `Phòng ${roomId} ngày ${matchedFormat} hiện đang trống`
                 );
             } else {
-                const roomInfo = roomOptions.find(
+                const roomInfo = ROOM_OPTIONS.find(
                     (room) => room.value === roomId
                 );
                 setCurrentBooking({
@@ -268,7 +260,7 @@ const RemoveBooking = () => {
                         placeholder="Chọn phòng cần xóa booking"
                         size="large"
                     >
-                        {roomOptions.map((room) => (
+                        {ROOM_OPTIONS.map((room) => (
                             <Select.Option key={room.value} value={room.value}>
                                 {room.label}
                             </Select.Option>
