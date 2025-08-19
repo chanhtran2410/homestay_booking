@@ -226,11 +226,11 @@ const MonthChecker = () => {
                     width: 120,
                     render: (text, record) => (
                         <div>
-                            <strong>{record.roomId}</strong>
-                            <br />
+                            <strong> {text.split(' - ')[1]}</strong>
+                            {/* <br />
                             <span style={{ fontSize: '12px', color: '#666' }}>
                                 {text.split(' - ')[1]}
-                            </span>
+                            </span> */}
                         </div>
                     ),
                 },

@@ -17,7 +17,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
-import { ROOM_OPTIONS_WITH_TYPE } from '../constants/roomOptions';
+import { ROOM_OPTIONS } from '../constants/roomOptions';
 import './styles.css';
 
 const { Title, Text } = Typography;
@@ -99,7 +99,7 @@ const DateRoomChecker = () => {
             );
 
             // Check each room's status for this date
-            const roomStatusList = ROOM_OPTIONS_WITH_TYPE.map((room) => {
+            const roomStatusList = ROOM_OPTIONS.map((room) => {
                 const roomRowIndex = data.findIndex(
                     (row) => row && row[1] === room.value
                 );
