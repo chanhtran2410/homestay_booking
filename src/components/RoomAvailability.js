@@ -4,6 +4,7 @@ import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { ROOM_OPTIONS } from '../constants/roomOptions';
+import './styles.css';
 
 const { Title } = Typography;
 
@@ -84,83 +85,72 @@ const RoomAvailability = () => {
 
     return (
         <div className="content-container">
-            <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/')}
-                type="text"
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '4px 8px',
-                    color: '#1890ff',
-                }}
-            >
-                Về trang chủ
-            </Button>
-            <Title level={3}>📅 Kiểm tra tình trạng phòng</Title>
-
-            <Form form={form} layout="vertical" onFinish={onFinish}>
-                <Form.Item
-                    name="roomId"
-                    label="Phòng"
-                    rules={[{ required: true, message: 'Chọn phòng' }]}
+            <div className="page-wrapper">
+                <Button
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => navigate('/')}
+                    type="text"
+                    className="back-button"
                 >
-                    <Select placeholder="Chọn phòng" size="large">
-                        {ROOM_OPTIONS.map((room) => (
-                            <Select.Option key={room.value} value={room.value}>
-                                {room.label}
-                            </Select.Option>
-                        ))}
-                    </Select>
-                </Form.Item>
+                    Về trang chủ
+                </Button>
+                <Title level={3} className="page-title">
+                    📅 Kiểm tra tình trạng phòng
+                </Title>
 
-                <Form.Item
-                    name="date"
-                    label="Ngày (tiêu đề cột)"
-                    rules={[{ required: true, message: 'Nhập ngày' }]}
-                    extra="Nhập ngày theo định dạng trong bảng tính (ví dụ: 1/5, 2/1, etc.)"
-                >
-                    <DatePicker
-                        format="DD/MM/YYYY"
-                        placeholder="Chọn ngày"
-                        size="large"
-                        style={{ width: '100%' }}
-                    />
-                </Form.Item>
-
-                <Form.Item>
-                    <Button
-                        type="primary"
-                        htmlType="submit"
-                        size="large"
-                        block
-                        loading={loading}
+                <Form form={form} layout="vertical" onFinish={onFinish}>
+                    <Form.Item
+                        name="roomId"
+                        label="Phòng"
+                        rules={[{ required: true, message: 'Chọn phòng' }]}
                     >
-                        {loading ? 'Đang kiểm tra...' : 'Kiểm tra'}
-                    </Button>
-                </Form.Item>
-            </Form>
+                        <Select placeholder="Chọn phòng" size="large">
+                            {ROOM_OPTIONS.map((room) => (
+                                <Select.Option
+                                    key={room.value}
+                                    value={room.value}
+                                >
+                                    {room.label}
+                                </Select.Option>
+                            ))}
+                        </Select>
+                    </Form.Item>
 
-            {result && (
-                <div
-                    style={{
-                        marginTop: 24,
-                        padding: 16,
-                        backgroundColor: result.includes('🟢')
-                            ? '#f6ffed'
-                            : '#fff2f0',
-                        border: `1px solid ${
-                            result.includes('🟢') ? '#b7eb8f' : '#ffb3b3'
-                        }`,
-                        borderRadius: 8,
-                        fontSize: 18,
-                        fontWeight: 500,
-                        textAlign: 'center',
-                    }}
-                >
-                    ✅ Trạng thái: {result}
-                </div>
-            )}
+                    <Form.Item
+                        name="date"
+                        label="Ngày (tiêu đề cột)"
+                        rules={[{ required: true, message: 'Nhập ngày' }]}
+                        extra="Nhập ngày theo định dạng trong bảng tính (ví dụ: 1/5, 2/1, etc.)"
+                    >
+                        <DatePicker
+                            format="DD/MM/YYYY"
+                            placeholder="Chọn ngày"
+                            size="large"
+                            style={{ width: '100%' }}
+                        />
+                    </Form.Item>
+
+                    <Form.Item>
+                        <Button
+                            type="primary"
+                            htmlType="submit"
+                            size="large"
+                            block
+                            loading={loading}
+                        >
+                            {loading ? 'Đang kiểm tra...' : 'Kiểm tra'}
+                        </Button>
+                    </Form.Item>
+                </Form>
+
+                {result && (
+                    <div className="result-display">
+                        <div className="result-text">
+                            ✅ Trạng thái: {result}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

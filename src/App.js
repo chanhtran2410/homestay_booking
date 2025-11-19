@@ -3,17 +3,11 @@ import React, {
     useContext,
     useState,
     useEffect,
-    memo,
     useMemo,
     useCallback,
 } from 'react';
-import {
-    BrowserRouter as Router,
-    Routes,
-    Route,
-    useNavigate,
-} from 'react-router-dom';
-import { Modal, Button, Typography, message, Spin, Flex } from 'antd';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Modal, Button, Typography, message } from 'antd';
 import { GoogleOutlined } from '@ant-design/icons';
 import Booking from './components/Booking';
 import './App.css'; // import the stylesheet
@@ -22,6 +16,7 @@ import DateRoomChecker from './components/DateRoomChecker';
 import RemoveBooking from './components/RemoveBooking';
 import MonthChecker from './components/MonthChecker';
 import RoomGallery from './components/RoomGallery';
+import Home from './Home/Home';
 
 const { Title, Text } = Typography;
 
@@ -410,117 +405,6 @@ const AuthProvider = ({ children }) => {
         </AuthContext.Provider>
     );
 };
-
-const Home = memo(() => {
-    const navigate = useNavigate();
-    const { isSignedIn, handleLogout, isLoading } = useAuth();
-
-    const handleNavigateToBooking = useCallback(
-        () => navigate('/booking'),
-        [navigate]
-    );
-    const handleNavigateToAvailability = useCallback(
-        () => navigate('/availability'),
-        [navigate]
-    );
-    const handleNavigateToDateChecking = useCallback(
-        () => navigate('/date_checking'),
-        [navigate]
-    );
-    const handleNavigateToMonthChecking = useCallback(
-        () => navigate('/month-checking'),
-        [navigate]
-    );
-    // const handleNavigateToRemoveBooking = useCallback(
-    //     () => navigate('/remove-booking'),
-    //     [navigate]
-    // );
-
-    if (isLoading) {
-        return (
-            <div
-                style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: '100vh',
-                    flexDirection: 'column',
-                }}
-            >
-                <Spin size="large" />
-                <div style={{ marginTop: 16 }}>Đang khởi tạo...</div>
-            </div>
-        );
-    }
-
-    if (!isSignedIn) {
-        return (
-            <div
-                style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: '100vh',
-                }}
-            >
-                <div>Vui lòng đăng nhập để tiếp tục...</div>
-            </div>
-        );
-    }
-
-    return (
-        <Flex
-            vertical
-            gap={40}
-            align="center"
-            className="home-container content-container"
-        >
-            <h2 className="home-heading">Quản lý Homestay</h2>
-
-            <div className="button-group">
-                <button
-                    className="nav-button"
-                    onClick={() => navigate('/rooms')}
-                >
-                    🏠 Xem phòng homestay
-                </button>
-                <button
-                    className="nav-button"
-                    onClick={handleNavigateToBooking}
-                >
-                    📘 Đặt phòng
-                </button>
-                <button
-                    className="nav-button"
-                    onClick={handleNavigateToAvailability}
-                >
-                    📅 Kiểm tra phòng
-                </button>
-                <button
-                    className="nav-button"
-                    onClick={handleNavigateToDateChecking}
-                >
-                    📊 Kiểm tra phòng trống trong ngày
-                </button>
-                <button
-                    className="nav-button"
-                    onClick={handleNavigateToMonthChecking}
-                >
-                    📊 Kiểm tra phòng trống trong tháng
-                </button>
-                <button
-                    className="nav-button"
-                    onClick={() => navigate('/remove-booking')}
-                >
-                    ⚙️ Xóa đặt phòng
-                </button>
-            </div>
-            <Button size="big" onClick={handleLogout}>
-                Đăng xuất
-            </Button>
-        </Flex>
-    );
-});
 
 const App = () => {
     return (

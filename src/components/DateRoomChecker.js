@@ -186,192 +186,127 @@ const DateRoomChecker = () => {
 
     return (
         <div className="content-container">
-            <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/')}
-                type="text"
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '4px 8px',
-                    color: '#1890ff',
-                }}
-            >
-                Về trang chủ
-            </Button>
-            <Title level={3}>📅 Kiểm tra phòng trống trong ngày</Title>
-
-            <Form form={form} layout="vertical" onFinish={checkRoomsForDate}>
-                <Form.Item
-                    name="date"
-                    label="Chọn ngày kiểm tra"
-                    rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}
+            <div className="page-wrapper">
+                <Button
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => navigate('/')}
+                    type="text"
+                    className="back-button"
                 >
-                    <DatePicker
-                        format="DD/MM/YYYY"
-                        placeholder="Chọn ngày"
-                        size="large"
-                        style={{ width: '100%' }}
-                    />
-                </Form.Item>
+                    Về trang chủ
+                </Button>
+                <Title level={3} className="page-title">
+                    📅 Kiểm tra phòng trống trong ngày
+                </Title>
 
-                <Form.Item>
-                    <Button
-                        type="primary"
-                        htmlType="submit"
-                        size="large"
-                        block
-                        loading={loading}
-                        icon={<CalendarOutlined />}
+                <Form
+                    form={form}
+                    layout="vertical"
+                    onFinish={checkRoomsForDate}
+                >
+                    <Form.Item
+                        name="date"
+                        label="Chọn ngày kiểm tra"
+                        rules={[
+                            { required: true, message: 'Vui lòng chọn ngày' },
+                        ]}
                     >
-                        {loading ? 'Đang kiểm tra...' : 'Kiểm tra tất cả phòng'}
-                    </Button>
-                </Form.Item>
-            </Form>
+                        <DatePicker
+                            format="DD/MM/YYYY"
+                            placeholder="Chọn ngày"
+                            size="large"
+                            style={{ width: '100%' }}
+                        />
+                    </Form.Item>
 
-            {roomStatuses.length > 0 && (
-                <>
-                    <div
-                        style={{
-                            marginBottom: 16,
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                        }}
-                    >
-                        <Title level={4} style={{ margin: 0 }}>
-                            Kết quả cho ngày: {selectedDate}
-                        </Title>
-                        <div>
-                            <Tag color="success" style={{ marginRight: 8 }}>
-                                {availableRooms.length} phòng trống
-                            </Tag>
-                            <Tag color="error">
-                                {occupiedRooms.length} phòng đã đặt
-                            </Tag>
+                    <Form.Item>
+                        <Button
+                            type="primary"
+                            htmlType="submit"
+                            size="large"
+                            block
+                            loading={loading}
+                            icon={<CalendarOutlined />}
+                        >
+                            {loading
+                                ? 'Đang kiểm tra...'
+                                : 'Kiểm tra tất cả phòng'}
+                        </Button>
+                    </Form.Item>
+                </Form>
+
+                {roomStatuses.length > 0 && (
+                    <>
+                        <div
+                            style={{
+                                marginBottom: 16,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Title level={4} style={{ margin: 0 }}>
+                                Kết quả cho ngày: {selectedDate}
+                            </Title>
+                            <div>
+                                <Tag color="success" style={{ marginRight: 8 }}>
+                                    {availableRooms.length} phòng trống
+                                </Tag>
+                                <Tag color="error">
+                                    {occupiedRooms.length} phòng đã đặt
+                                </Tag>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Available Rooms */}
-                    {availableRooms.length > 0 && (
-                        <Card
-                            title={
-                                <span style={{ color: '#52c41a' }}>
-                                    <CheckCircleOutlined
-                                        style={{ marginRight: 8 }}
-                                    />
-                                    Phòng trống ({availableRooms.length})
-                                </span>
-                            }
-                            style={{ marginBottom: 16 }}
-                        >
-                            <List
-                                dataSource={availableRooms}
-                                renderItem={(room) => (
-                                    <List.Item
-                                        style={{
-                                            border: 'none',
-                                            padding: '8px 0',
-                                        }}
-                                    >
-                                        <div
+                        {/* Available Rooms */}
+                        {availableRooms.length > 0 && (
+                            <Card
+                                title={
+                                    <span style={{ color: '#52c41a' }}>
+                                        <CheckCircleOutlined
+                                            style={{ marginRight: 8 }}
+                                        />
+                                        Phòng trống ({availableRooms.length})
+                                    </span>
+                                }
+                                style={{ marginBottom: 16 }}
+                            >
+                                <List
+                                    dataSource={availableRooms}
+                                    renderItem={(room) => (
+                                        <List.Item
                                             style={{
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                width: '100%',
-                                                alignItems: 'center',
+                                                border: 'none',
+                                                padding: '8px 0',
                                             }}
                                         >
-                                            <div>
-                                                <Text
-                                                    strong
-                                                    style={{ fontSize: 16 }}
-                                                >
-                                                    {room.label}
-                                                </Text>
-                                                <br />
-                                                <Text
-                                                    type="secondary"
-                                                    style={{ fontSize: 14 }}
-                                                >
-                                                    {room.type === 'bungalow'
-                                                        ? 'Bungalow'
-                                                        : 'Phòng thường'}
-                                                </Text>
-                                            </div>
-                                            <Tag
-                                                color={getStatusColor(
-                                                    room.status
-                                                )}
-                                                icon={getStatusIcon(
-                                                    room.status
-                                                )}
-                                                style={{
-                                                    fontSize: 14,
-                                                    padding: '4px 12px',
-                                                }}
-                                            >
-                                                {getStatusText(room)}
-                                            </Tag>
-                                        </div>
-                                    </List.Item>
-                                )}
-                            />
-                        </Card>
-                    )}
-
-                    {/* Occupied Rooms */}
-                    {occupiedRooms.length > 0 && (
-                        <Card
-                            title={
-                                <span style={{ color: '#ff4d4f' }}>
-                                    <CloseCircleOutlined
-                                        style={{ marginRight: 8 }}
-                                    />
-                                    Phòng đã đặt ({occupiedRooms.length})
-                                </span>
-                            }
-                        >
-                            <List
-                                dataSource={occupiedRooms}
-                                renderItem={(room) => (
-                                    <List.Item
-                                        style={{
-                                            border: 'none',
-                                            padding: '8px 0',
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                width: '100%',
-                                                alignItems: 'center',
-                                            }}
-                                        >
-                                            <div>
-                                                <Text
-                                                    strong
-                                                    style={{ fontSize: 16 }}
-                                                >
-                                                    {room.label}
-                                                </Text>
-                                                <br />
-                                                <Text
-                                                    type="secondary"
-                                                    style={{ fontSize: 14 }}
-                                                >
-                                                    {room.type === 'bungalow'
-                                                        ? 'Bungalow'
-                                                        : 'Phòng thường'}
-                                                </Text>
-                                            </div>
                                             <div
                                                 style={{
-                                                    textAlign: 'right',
-                                                    maxWidth: '200px',
+                                                    display: 'flex',
+                                                    justifyContent:
+                                                        'space-between',
+                                                    width: '100%',
+                                                    alignItems: 'center',
                                                 }}
                                             >
+                                                <div>
+                                                    <Text
+                                                        strong
+                                                        style={{ fontSize: 16 }}
+                                                    >
+                                                        {room.label}
+                                                    </Text>
+                                                    <br />
+                                                    <Text
+                                                        type="secondary"
+                                                        style={{ fontSize: 14 }}
+                                                    >
+                                                        {room.type ===
+                                                        'bungalow'
+                                                            ? 'Bungalow'
+                                                            : 'Phòng thường'}
+                                                    </Text>
+                                                </div>
                                                 <Tag
                                                     color={getStatusColor(
                                                         room.status
@@ -380,30 +315,106 @@ const DateRoomChecker = () => {
                                                         room.status
                                                     )}
                                                     style={{
-                                                        fontSize: 12,
-                                                        marginBottom: 4,
+                                                        fontSize: 14,
+                                                        padding: '4px 12px',
                                                     }}
                                                 >
-                                                    Đã đặt
+                                                    {getStatusText(room)}
                                                 </Tag>
-                                                <br />
-                                                <Text
+                                            </div>
+                                        </List.Item>
+                                    )}
+                                />
+                            </Card>
+                        )}
+
+                        {/* Occupied Rooms */}
+                        {occupiedRooms.length > 0 && (
+                            <Card
+                                title={
+                                    <span style={{ color: '#ff4d4f' }}>
+                                        <CloseCircleOutlined
+                                            style={{ marginRight: 8 }}
+                                        />
+                                        Phòng đã đặt ({occupiedRooms.length})
+                                    </span>
+                                }
+                            >
+                                <List
+                                    dataSource={occupiedRooms}
+                                    renderItem={(room) => (
+                                        <List.Item
+                                            style={{
+                                                border: 'none',
+                                                padding: '8px 0',
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent:
+                                                        'space-between',
+                                                    width: '100%',
+                                                    alignItems: 'center',
+                                                }}
+                                            >
+                                                <div>
+                                                    <Text
+                                                        strong
+                                                        style={{ fontSize: 16 }}
+                                                    >
+                                                        {room.label}
+                                                    </Text>
+                                                    <br />
+                                                    <Text
+                                                        type="secondary"
+                                                        style={{ fontSize: 14 }}
+                                                    >
+                                                        {room.type ===
+                                                        'bungalow'
+                                                            ? 'Bungalow'
+                                                            : 'Phòng thường'}
+                                                    </Text>
+                                                </div>
+                                                <div
                                                     style={{
-                                                        fontSize: 12,
-                                                        color: '#666',
+                                                        textAlign: 'right',
+                                                        maxWidth: '200px',
                                                     }}
                                                 >
-                                                    {room.value}
-                                                </Text>
+                                                    <Tag
+                                                        color={getStatusColor(
+                                                            room.status
+                                                        )}
+                                                        icon={getStatusIcon(
+                                                            room.status
+                                                        )}
+                                                        style={{
+                                                            fontSize: 12,
+                                                            marginBottom: 4,
+                                                        }}
+                                                    >
+                                                        Đã đặt
+                                                    </Tag>
+                                                    <br />
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: '#666',
+                                                        }}
+                                                    >
+                                                        {room.value}
+                                                    </Text>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </List.Item>
-                                )}
-                            />
-                        </Card>
-                    )}
-                </>
-            )}
+                                        </List.Item>
+                                    )}
+                                />
+                            </Card>
+                        )}
+                    </>
+                )}
+            </div>
         </div>
     );
 };

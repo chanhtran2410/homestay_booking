@@ -244,7 +244,7 @@ const MonthChecker = () => {
                             <div style={{ fontWeight: 'bold' }}>
                                 {dateInfo.day}
                             </div>
-                            <div style={{ fontSize: '10px', color: '#666' }}>
+                            <div style={{ fontSize: '10px', color: 'white' }}>
                                 {dateInfo.date.format('ddd')}
                             </div>
                         </div>
@@ -419,183 +419,135 @@ const MonthChecker = () => {
 
     return (
         <div className="content-container">
-            <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/')}
-                type="text"
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '4px 8px',
-                    color: '#1890ff',
-                }}
-            >
-                Về trang chủ
-            </Button>
-            <Title level={3}>
-                <CalendarOutlined
-                    style={{ marginRight: 8, color: '#1890ff' }}
-                />
-                Dashboard tháng - Tình trạng phòng
-            </Title>
-            <div
-                style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '16px',
-                }}
-            >
-                <div>
-                    <MonthPicker
-                        value={selectedMonth}
-                        onChange={handleMonthChange}
-                        format="MM/YYYY"
-                        placeholder="Chọn tháng"
-                        size="large"
-                    />
-                </div>
-
+            <div className="page-wrapper">
+                <Button
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => navigate('/')}
+                    type="text"
+                    className="back-button"
+                >
+                    Về trang chủ
+                </Button>
+                <Title level={3} className="page-title">
+                    <CalendarOutlined style={{ marginRight: 8 }} />
+                    Dashboard tháng - Tình trạng phòng
+                </Title>
                 <div
                     style={{
                         display: 'flex',
-                        gap: '12px',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
                         flexWrap: 'wrap',
+                        gap: '16px',
                     }}
                 >
-                    <Tag color="success" style={{ margin: 0 }}>
-                        Trống: {availableCells}
-                    </Tag>
-                    <Tag color="warning" style={{ margin: 0 }}>
-                        Đang chờ: {pendingCells}
-                    </Tag>
-                    <Tag color="error" style={{ margin: 0 }}>
-                        Đã đặt: {bookedCells}
-                    </Tag>
-                    <Tag color="default" style={{ margin: 0 }}>
-                        Tổng: {totalCells}
-                    </Tag>
-                </div>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-                <Title level={4} style={{ marginBottom: 8 }}>
-                    Tháng {selectedMonth.format('MM/YYYY')}
-                </Title>
-                <div
-                    style={{
-                        fontSize: '12px',
-                        color: '#666',
-                        marginBottom: 8,
-                    }}
-                >
-                    <Tag color="success">Xanh = Trống</Tag>
-                    <Tag color="warning">Vàng = Đang chờ cọc</Tag>
-                    <Tag color="error">Đỏ = Đã đặt cọc</Tag>
-                </div>
-            </div>
-            {loading ? (
-                <div style={{ textAlign: 'center', padding: 40 }}>
-                    <Spin size="large" />
-                    <div style={{ marginTop: 16 }}>Đang tải dữ liệu...</div>
-                </div>
-            ) : (
-                <Table
-                    columns={tableColumns}
-                    dataSource={monthData}
-                    pagination={false}
-                    scroll={{ x: 'max-content' }}
-                    size="small"
-                    bordered
-                    style={{
-                        backgroundColor: 'white',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                    }}
-                />
-            )}
-            <Card
-                style={{
-                    marginTop: 16,
-                    background: '#f6ffed',
-                    border: '1px solid #b7eb8f',
-                }}
-            >
-                <Title level={5} style={{ color: '#389e0d', marginBottom: 8 }}>
-                    💡 Hướng dẫn sử dụng:
-                </Title>
-                <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
-                    <li>Chọn tháng muốn xem từ dropdown</li>
-                    <li>Dữ liệu sẽ tự động tải và hiển thị trong bảng</li>
-                    <li>Click vào ô để xem thông tin chi tiết</li>
-                    <li>Màu sắc: Xanh = Trống, Vàng = Chờ cọc, Đỏ = Đã cọc</li>
-                </ul>
-            </Card>
-            {/* Modal for booking details */}
-            <Modal
-                title={
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <InfoCircleOutlined
-                            style={{ marginRight: 8, color: '#1890ff' }}
+                    <div>
+                        <MonthPicker
+                            value={selectedMonth}
+                            onChange={handleMonthChange}
+                            format="MM/YYYY"
+                            placeholder="Chọn tháng"
+                            size="large"
                         />
-                        Chi tiết đặt phòng
                     </div>
-                }
-                open={modalVisible}
-                onCancel={() => setModalVisible(false)}
-                footer={null}
-                width={500}
-            >
-                {selectedCellInfo && (
-                    <div style={{ padding: '16px 0' }}>
-                        <div style={{ marginBottom: 16 }}>
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    marginBottom: 8,
-                                }}
-                            >
-                                <strong>Ngày:</strong>
-                                <span>{selectedCellInfo.date}</span>
-                            </div>
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    marginBottom: 8,
-                                }}
-                            >
-                                <strong>Phòng:</strong>
-                                <span>{selectedCellInfo.roomLabel}</span>
-                            </div>
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    marginBottom: 8,
-                                }}
-                            >
-                                <strong>Trạng thái:</strong>
-                                <Tag
-                                    color={
-                                        selectedCellInfo.statusType ===
-                                        'available'
-                                            ? 'success'
-                                            : selectedCellInfo.statusType ===
-                                              'pending'
-                                            ? 'warning'
-                                            : selectedCellInfo.statusType ===
-                                              'confirmed'
-                                            ? 'error'
-                                            : 'processing'
-                                    }
-                                >
-                                    {selectedCellInfo.status}
-                                </Tag>
-                            </div>
 
-                            {selectedCellInfo.customerName && (
+                    <div
+                        style={{
+                            display: 'flex',
+                            gap: '12px',
+                            flexWrap: 'wrap',
+                        }}
+                    >
+                        <Tag color="success" style={{ margin: 0 }}>
+                            Trống: {availableCells}
+                        </Tag>
+                        <Tag color="warning" style={{ margin: 0 }}>
+                            Đang chờ: {pendingCells}
+                        </Tag>
+                        <Tag color="error" style={{ margin: 0 }}>
+                            Đã đặt: {bookedCells}
+                        </Tag>
+                        <Tag color="default" style={{ margin: 0 }}>
+                            Tổng: {totalCells}
+                        </Tag>
+                    </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                    <Title level={4} style={{ marginBottom: 8 }}>
+                        Tháng {selectedMonth.format('MM/YYYY')}
+                    </Title>
+                    <div
+                        style={{
+                            fontSize: '12px',
+                            color: '#666',
+                            marginBottom: 8,
+                        }}
+                    >
+                        <Tag color="success">Xanh = Trống</Tag>
+                        <Tag color="warning">Vàng = Đang chờ cọc</Tag>
+                        <Tag color="error">Đỏ = Đã đặt cọc</Tag>
+                    </div>
+                </div>
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: 40 }}>
+                        <Spin size="large" />
+                        <div style={{ marginTop: 16 }}>Đang tải dữ liệu...</div>
+                    </div>
+                ) : (
+                    <Table
+                        columns={tableColumns}
+                        dataSource={monthData}
+                        pagination={false}
+                        scroll={{ x: 'max-content' }}
+                        size="small"
+                        bordered
+                        style={{
+                            backgroundColor: 'white',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                        }}
+                    />
+                )}
+                <Card
+                    style={{
+                        marginTop: 16,
+                        background: '#f6ffed',
+                        border: '1px solid #b7eb8f',
+                    }}
+                >
+                    <Title
+                        level={5}
+                        style={{ color: '#389e0d', marginBottom: 8 }}
+                    >
+                        💡 Hướng dẫn sử dụng:
+                    </Title>
+                    <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+                        <li>Chọn tháng muốn xem từ dropdown</li>
+                        <li>Dữ liệu sẽ tự động tải và hiển thị trong bảng</li>
+                        <li>Click vào ô để xem thông tin chi tiết</li>
+                        <li>
+                            Màu sắc: Xanh = Trống, Vàng = Chờ cọc, Đỏ = Đã cọc
+                        </li>
+                    </ul>
+                </Card>
+                {/* Modal for booking details */}
+                <Modal
+                    title={
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <InfoCircleOutlined
+                                style={{ marginRight: 8, color: '#1890ff' }}
+                            />
+                            Chi tiết đặt phòng
+                        </div>
+                    }
+                    open={modalVisible}
+                    onCancel={() => setModalVisible(false)}
+                    footer={null}
+                    width={500}
+                >
+                    {selectedCellInfo && (
+                        <div style={{ padding: '16px 0' }}>
+                            <div style={{ marginBottom: 16 }}>
                                 <div
                                     style={{
                                         display: 'flex',
@@ -603,13 +555,46 @@ const MonthChecker = () => {
                                         marginBottom: 8,
                                     }}
                                 >
-                                    <strong>Thông tin người đặt:</strong>
-                                    <span>{selectedCellInfo.customerName}</span>
+                                    <strong>Ngày:</strong>
+                                    <span>{selectedCellInfo.date}</span>
                                 </div>
-                            )}
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    <strong>Phòng:</strong>
+                                    <span>{selectedCellInfo.roomLabel}</span>
+                                </div>
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    <strong>Trạng thái:</strong>
+                                    <Tag
+                                        color={
+                                            selectedCellInfo.statusType ===
+                                            'available'
+                                                ? 'success'
+                                                : selectedCellInfo.statusType ===
+                                                  'pending'
+                                                ? 'warning'
+                                                : selectedCellInfo.statusType ===
+                                                  'confirmed'
+                                                ? 'error'
+                                                : 'processing'
+                                        }
+                                    >
+                                        {selectedCellInfo.status}
+                                    </Tag>
+                                </div>
 
-                            {selectedCellInfo.depositAmount &&
-                                selectedCellInfo.statusType === 'confirmed' && (
+                                {selectedCellInfo.customerName && (
                                     <div
                                         style={{
                                             display: 'flex',
@@ -617,46 +602,64 @@ const MonthChecker = () => {
                                             marginBottom: 8,
                                         }}
                                     >
-                                        <strong>Tiền đặt cọc:</strong>
-                                        <span
-                                            style={{
-                                                color: '#52c41a',
-                                                fontWeight: 'bold',
-                                            }}
-                                        >
-                                            {selectedCellInfo.depositAmount.toLocaleString()}{' '}
-                                            VNĐ
+                                        <strong>Thông tin người đặt:</strong>
+                                        <span>
+                                            {selectedCellInfo.customerName}
                                         </span>
                                     </div>
                                 )}
 
-                            {selectedCellInfo.fullInfo &&
-                                selectedCellInfo.fullInfo.trim() !== '' && (
-                                    <div
-                                        style={{
-                                            marginTop: 16,
-                                            padding: 12,
-                                            backgroundColor: '#f5f5f5',
-                                            borderRadius: 4,
-                                        }}
-                                    >
-                                        <strong style={{ color: '#666' }}>
-                                            Thông tin đầy đủ:
-                                        </strong>
+                                {selectedCellInfo.depositAmount &&
+                                    selectedCellInfo.statusType ===
+                                        'confirmed' && (
                                         <div
                                             style={{
-                                                marginTop: 8,
-                                                fontStyle: 'italic',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                marginBottom: 8,
                                             }}
                                         >
-                                            "{selectedCellInfo.fullInfo}"
+                                            <strong>Tiền đặt cọc:</strong>
+                                            <span
+                                                style={{
+                                                    color: '#52c41a',
+                                                    fontWeight: 'bold',
+                                                }}
+                                            >
+                                                {selectedCellInfo.depositAmount.toLocaleString()}{' '}
+                                                VNĐ
+                                            </span>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+
+                                {selectedCellInfo.fullInfo &&
+                                    selectedCellInfo.fullInfo.trim() !== '' && (
+                                        <div
+                                            style={{
+                                                marginTop: 16,
+                                                padding: 12,
+                                                backgroundColor: '#f5f5f5',
+                                                borderRadius: 4,
+                                            }}
+                                        >
+                                            <strong style={{ color: '#666' }}>
+                                                Thông tin đầy đủ:
+                                            </strong>
+                                            <div
+                                                style={{
+                                                    marginTop: 8,
+                                                    fontStyle: 'italic',
+                                                }}
+                                            >
+                                                "{selectedCellInfo.fullInfo}"
+                                            </div>
+                                        </div>
+                                    )}
+                            </div>
                         </div>
-                    </div>
-                )}
-            </Modal>
+                    )}
+                </Modal>
+            </div>
         </div>
     );
 };

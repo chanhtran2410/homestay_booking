@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { ROOM_OPTIONS } from '../constants/roomOptions';
+import './styles.css';
 // import { useAuth } from '../App';
 
 const { Title, Text } = Typography;
@@ -232,174 +233,188 @@ const RemoveBooking = () => {
 
     return (
         <div className="content-container">
-            <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/')}
-                type="text"
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '4px 8px',
-                    color: '#1890ff',
-                }}
-            >
-                Về trang chủ
-            </Button>
-            <Title level={3}>
-                <DeleteOutlined style={{ marginRight: 8, color: '#ff4d4f' }} />
-                Xóa đặt phòng
-            </Title>
-
-            <Form form={form} layout="vertical" onFinish={checkCurrentBooking}>
-                <Form.Item
-                    name="roomId"
-                    label="Phòng"
-                    rules={[{ required: true, message: 'Vui lòng chọn phòng' }]}
+            <div className="page-wrapper">
+                <Button
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => navigate('/')}
+                    type="text"
+                    className="back-button"
                 >
-                    <Select
-                        placeholder="Chọn phòng cần xóa booking"
-                        size="large"
-                    >
-                        {ROOM_OPTIONS.map((room) => (
-                            <Select.Option key={room.value} value={room.value}>
-                                {room.label}
-                            </Select.Option>
-                        ))}
-                    </Select>
-                </Form.Item>
+                    Về trang chủ
+                </Button>
+                <Title level={3} className="page-title">
+                    <DeleteOutlined style={{ marginRight: 8 }} />
+                    Xóa đặt phòng
+                </Title>
 
-                <Form.Item
-                    name="date"
-                    label="Ngày đặt phòng"
-                    rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}
+                <Form
+                    form={form}
+                    layout="vertical"
+                    onFinish={checkCurrentBooking}
                 >
-                    <DatePicker
-                        format="DD/MM/YYYY"
-                        placeholder="Chọn ngày cần xóa booking"
-                        size="large"
-                        style={{ width: '100%' }}
-                    />
-                </Form.Item>
-
-                <Form.Item>
-                    <Button
-                        type="primary"
-                        htmlType="submit"
-                        size="large"
-                        block
-                        loading={loading}
-                        style={{ marginBottom: 8 }}
+                    <Form.Item
+                        name="roomId"
+                        label="Phòng"
+                        rules={[
+                            { required: true, message: 'Vui lòng chọn phòng' },
+                        ]}
                     >
-                        {loading ? 'Đang tìm kiếm...' : 'Tìm kiếm booking'}
-                    </Button>
-                </Form.Item>
-            </Form>
+                        <Select
+                            placeholder="Chọn phòng cần xóa booking"
+                            size="large"
+                        >
+                            {ROOM_OPTIONS.map((room) => (
+                                <Select.Option
+                                    key={room.value}
+                                    value={room.value}
+                                >
+                                    {room.label}
+                                </Select.Option>
+                            ))}
+                        </Select>
+                    </Form.Item>
 
-            {bookingFound && currentBooking && (
-                <Card
-                    title={
-                        <span style={{ color: '#ff4d4f' }}>
-                            <ExclamationCircleOutlined
-                                style={{ marginRight: 8 }}
-                            />
-                            Booking được tìm thấy
-                        </span>
-                    }
-                    style={{ marginBottom: 16 }}
-                >
-                    <div
-                        style={{
-                            background: '#fff2f0',
-                            padding: 16,
-                            borderRadius: 8,
-                            border: '1px solid #ffccc7',
-                        }}
+                    <Form.Item
+                        name="date"
+                        label="Ngày đặt phòng"
+                        rules={[
+                            { required: true, message: 'Vui lòng chọn ngày' },
+                        ]}
                     >
-                        <div style={{ marginBottom: 12 }}>
-                            <Text
-                                strong
-                                style={{ display: 'block', marginBottom: 4 }}
-                            >
-                                Thông tin booking:
-                            </Text>
-                            <div
-                                style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: '120px 1fr',
-                                    gap: '8px',
-                                    marginBottom: 8,
-                                }}
-                            >
-                                <Text strong>Phòng:</Text>
-                                <Text>{currentBooking.roomLabel}</Text>
-                                <Text strong>Ngày:</Text>
-                                <Text>{currentBooking.date}</Text>
-                                <Text strong>Chi tiết:</Text>
-                                <Text style={{ color: '#1890ff' }}>
-                                    {currentBooking.value}
-                                </Text>
-                            </div>
-                        </div>
+                        <DatePicker
+                            format="DD/MM/YYYY"
+                            placeholder="Chọn ngày cần xóa booking"
+                            size="large"
+                            style={{ width: '100%' }}
+                        />
+                    </Form.Item>
 
+                    <Form.Item>
                         <Button
                             type="primary"
-                            danger
+                            htmlType="submit"
                             size="large"
                             block
-                            icon={<DeleteOutlined />}
-                            onClick={confirmRemoval}
                             loading={loading}
+                            style={{ marginBottom: 8 }}
                         >
-                            Xóa booking này
+                            {loading ? 'Đang tìm kiếm...' : 'Tìm kiếm booking'}
                         </Button>
-                    </div>
-                </Card>
-            )}
+                    </Form.Item>
+                </Form>
 
-            {!bookingFound &&
-                currentBooking === null &&
-                form.getFieldsValue().roomId &&
-                form.getFieldsValue().date && (
-                    <Card>
-                        <div style={{ textAlign: 'center', padding: 20 }}>
-                            <CheckCircleOutlined
-                                style={{
-                                    fontSize: 48,
-                                    color: '#52c41a',
-                                    marginBottom: 16,
-                                }}
-                            />
-                            <Title level={4} style={{ color: '#52c41a' }}>
-                                Phòng đang trống
-                            </Title>
-                            <Text>
-                                Không có booking nào cần xóa cho phòng và ngày
-                                đã chọn.
-                            </Text>
+                {bookingFound && currentBooking && (
+                    <Card
+                        title={
+                            <span style={{ color: '#ff4d4f' }}>
+                                <ExclamationCircleOutlined
+                                    style={{ marginRight: 8 }}
+                                />
+                                Booking được tìm thấy
+                            </span>
+                        }
+                        style={{ marginBottom: 16 }}
+                    >
+                        <div
+                            style={{
+                                background: '#fff2f0',
+                                padding: 16,
+                                borderRadius: 8,
+                                border: '1px solid #ffccc7',
+                            }}
+                        >
+                            <div style={{ marginBottom: 12 }}>
+                                <Text
+                                    strong
+                                    style={{
+                                        display: 'block',
+                                        marginBottom: 4,
+                                    }}
+                                >
+                                    Thông tin booking:
+                                </Text>
+                                <div
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '120px 1fr',
+                                        gap: '8px',
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    <Text strong>Phòng:</Text>
+                                    <Text>{currentBooking.roomLabel}</Text>
+                                    <Text strong>Ngày:</Text>
+                                    <Text>{currentBooking.date}</Text>
+                                    <Text strong>Chi tiết:</Text>
+                                    <Text style={{ color: '#1890ff' }}>
+                                        {currentBooking.value}
+                                    </Text>
+                                </div>
+                            </div>
+
+                            <Button
+                                type="primary"
+                                danger
+                                size="large"
+                                block
+                                icon={<DeleteOutlined />}
+                                onClick={confirmRemoval}
+                                loading={loading}
+                            >
+                                Xóa booking này
+                            </Button>
                         </div>
                     </Card>
                 )}
 
-            <Card
-                style={{
-                    marginTop: 16,
-                    background: '#f6ffed',
-                    border: '1px solid #b7eb8f',
-                }}
-            >
-                <Title level={5} style={{ color: '#389e0d', marginBottom: 8 }}>
-                    💡 Hướng dẫn sử dụng:
-                </Title>
-                <ol style={{ marginBottom: 0, paddingLeft: 20 }}>
-                    <li>Chọn phòng và ngày cần xóa booking</li>
-                    <li>Nhấn "Tìm kiếm booking" để kiểm tra</li>
-                    <li>
-                        Nếu có booking, xác nhận xóa bằng cách nhấn "Xóa booking
-                        này"
-                    </li>
-                    <li>Xác nhận lần nữa trong popup để hoàn tất</li>
-                </ol>
-            </Card>
+                {!bookingFound &&
+                    currentBooking === null &&
+                    form.getFieldsValue().roomId &&
+                    form.getFieldsValue().date && (
+                        <Card>
+                            <div style={{ textAlign: 'center', padding: 20 }}>
+                                <CheckCircleOutlined
+                                    style={{
+                                        fontSize: 48,
+                                        color: '#52c41a',
+                                        marginBottom: 16,
+                                    }}
+                                />
+                                <Title level={4} style={{ color: '#52c41a' }}>
+                                    Phòng đang trống
+                                </Title>
+                                <Text>
+                                    Không có booking nào cần xóa cho phòng và
+                                    ngày đã chọn.
+                                </Text>
+                            </div>
+                        </Card>
+                    )}
+
+                <Card
+                    style={{
+                        marginTop: 16,
+                        background: '#f6ffed',
+                        border: '1px solid #b7eb8f',
+                    }}
+                >
+                    <Title
+                        level={5}
+                        style={{ color: '#389e0d', marginBottom: 8 }}
+                    >
+                        💡 Hướng dẫn sử dụng:
+                    </Title>
+                    <ol style={{ marginBottom: 0, paddingLeft: 20 }}>
+                        <li>Chọn phòng và ngày cần xóa booking</li>
+                        <li>Nhấn "Tìm kiếm booking" để kiểm tra</li>
+                        <li>
+                            Nếu có booking, xác nhận xóa bằng cách nhấn "Xóa
+                            booking này"
+                        </li>
+                        <li>Xác nhận lần nữa trong popup để hoàn tất</li>
+                    </ol>
+                </Card>
+            </div>
         </div>
     );
 };

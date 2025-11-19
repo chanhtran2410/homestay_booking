@@ -236,155 +236,157 @@ const Booking = memo(() => {
 
     return (
         <div className="content-container">
-            <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={handleNavigateHome}
-                type="text"
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '4px 8px',
-                    color: '#1890ff',
-                }}
-            >
-                Về trang chủ
-            </Button>
-            <Title level={3} className="booking-title">
-                Đặt phòng
-            </Title>
-
-            <Form
-                form={form}
-                layout="vertical"
-                onFinish={onFinish}
-                className="booking-form"
-            >
-                <Form.Item
-                    name="roomIds"
-                    label="Phòng cần đặt (có thể chọn nhiều)"
-                    rules={[
-                        {
-                            required: true,
-                            message: 'Vui lòng chọn ít nhất một phòng',
-                        },
-                    ]}
+            <div className="page-wrapper">
+                <Button
+                    icon={<ArrowLeftOutlined />}
+                    onClick={handleNavigateHome}
+                    type="text"
+                    className="back-button"
                 >
-                    <Select
-                        mode="multiple"
-                        placeholder="Chọn phòng cần đặt (có thể chọn nhiều)"
-                        size="large"
-                        maxTagCount="responsive"
-                    >
-                        {ROOM_OPTIONS.map((room) => (
-                            <Select.Option key={room.value} value={room.value}>
-                                {room.label}
-                            </Select.Option>
-                        ))}
-                    </Select>
-                </Form.Item>
+                    Về trang chủ
+                </Button>
+                <Title level={3} className="page-title">
+                    📘 Đặt phòng
+                </Title>
 
-                <Form.Item
-                    name="fromDate"
-                    label="Ngày nhận phòng"
-                    rules={[
-                        {
-                            required: true,
-                            message: 'Vui lòng chọn ngày nhận phòng',
-                        },
-                    ]}
+                <Form
+                    form={form}
+                    layout="vertical"
+                    onFinish={onFinish}
+                    className="booking-form"
                 >
-                    <DatePicker
-                        format="DD/MM/YYYY"
-                        placeholder="Chọn ngày nhận phòng"
-                        size="large"
-                        style={{ width: '100%' }}
-                    />
-                </Form.Item>
-
-                <Form.Item
-                    name="numberOfNights"
-                    label="Số đêm lưu trú"
-                    rules={[
-                        {
-                            required: true,
-                            message: 'Vui lòng nhập số đêm lưu trú',
-                        },
-                        {
-                            type: 'number',
-                            min: 1,
-                            max: 30,
-                            message: 'Số đêm phải từ 1 đến 30',
-                        },
-                    ]}
-                >
-                    <InputNumber
-                        placeholder="Ví dụ: 3"
-                        size="large"
-                        min={1}
-                        max={30}
-                        style={{ width: '100%' }}
-                    />
-                </Form.Item>
-
-                <Form.Item
-                    name="name"
-                    label="Tên khách hàng"
-                    rules={[{ required: true, message: 'Please enter name' }]}
-                >
-                    <Input placeholder="e.g. mh" size="large" />
-                </Form.Item>
-
-                <Form.Item
-                    name="value"
-                    label="Trạng thái phòng"
-                    rules={[
-                        {
-                            required: true,
-                            message: 'Please chọn trạng thái phòng',
-                        },
-                    ]}
-                >
-                    <Select
-                        placeholder="Chọn trạng thái"
-                        onChange={(val) => setRoomStatus(val)}
-                        options={[
-                            { label: 'Đã đặt cọc', value: 'Đã đặt cọc' },
-                            {
-                                label: 'Đang đợi đặt cọc',
-                                value: 'Đang đợi đặt cọc',
-                            },
-                        ]}
-                        size="large"
-                    />
-                </Form.Item>
-
-                {roomStatus === 'Đã đặt cọc' && (
                     <Form.Item
-                        name="price"
-                        label="Tiền đặt cọc"
+                        name="roomIds"
+                        label="Phòng cần đặt (có thể chọn nhiều)"
                         rules={[
                             {
                                 required: true,
-                                message: 'Vui lòng nhập tiền cọc',
+                                message: 'Vui lòng chọn ít nhất một phòng',
                             },
                         ]}
                     >
-                        <Input placeholder="e.g. 500" size="large" />
+                        <Select
+                            mode="multiple"
+                            placeholder="Chọn phòng cần đặt (có thể chọn nhiều)"
+                            size="large"
+                            maxTagCount="responsive"
+                        >
+                            {ROOM_OPTIONS.map((room) => (
+                                <Select.Option
+                                    key={room.value}
+                                    value={room.value}
+                                >
+                                    {room.label}
+                                </Select.Option>
+                            ))}
+                        </Select>
                     </Form.Item>
-                )}
 
-                <Form.Item>
-                    <Button
-                        type="primary"
-                        htmlType="submit"
-                        className="booking-button"
-                        size="large"
-                        block
+                    <Form.Item
+                        name="fromDate"
+                        label="Ngày nhận phòng"
+                        rules={[
+                            {
+                                required: true,
+                                message: 'Vui lòng chọn ngày nhận phòng',
+                            },
+                        ]}
                     >
-                        Xác nhận đặt phòng
-                    </Button>
-                </Form.Item>
-            </Form>
+                        <DatePicker
+                            format="DD/MM/YYYY"
+                            placeholder="Chọn ngày nhận phòng"
+                            size="large"
+                            style={{ width: '100%' }}
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="numberOfNights"
+                        label="Số đêm lưu trú"
+                        rules={[
+                            {
+                                required: true,
+                                message: 'Vui lòng nhập số đêm lưu trú',
+                            },
+                            {
+                                type: 'number',
+                                min: 1,
+                                max: 30,
+                                message: 'Số đêm phải từ 1 đến 30',
+                            },
+                        ]}
+                    >
+                        <InputNumber
+                            placeholder="Ví dụ: 3"
+                            size="large"
+                            min={1}
+                            max={30}
+                            style={{ width: '100%' }}
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="name"
+                        label="Tên khách hàng"
+                        rules={[
+                            { required: true, message: 'Please enter name' },
+                        ]}
+                    >
+                        <Input placeholder="e.g. mh" size="large" />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="value"
+                        label="Trạng thái phòng"
+                        rules={[
+                            {
+                                required: true,
+                                message: 'Please chọn trạng thái phòng',
+                            },
+                        ]}
+                    >
+                        <Select
+                            placeholder="Chọn trạng thái"
+                            onChange={(val) => setRoomStatus(val)}
+                            options={[
+                                { label: 'Đã đặt cọc', value: 'Đã đặt cọc' },
+                                {
+                                    label: 'Đang đợi đặt cọc',
+                                    value: 'Đang đợi đặt cọc',
+                                },
+                            ]}
+                            size="large"
+                        />
+                    </Form.Item>
+
+                    {roomStatus === 'Đã đặt cọc' && (
+                        <Form.Item
+                            name="price"
+                            label="Tiền đặt cọc"
+                            rules={[
+                                {
+                                    required: true,
+                                    message: 'Vui lòng nhập tiền cọc',
+                                },
+                            ]}
+                        >
+                            <Input placeholder="e.g. 500" size="large" />
+                        </Form.Item>
+                    )}
+
+                    <Form.Item>
+                        <Button
+                            type="primary"
+                            htmlType="submit"
+                            className="booking-button"
+                            size="large"
+                            block
+                        >
+                            Xác nhận đặt phòng
+                        </Button>
+                    </Form.Item>
+                </Form>
+            </div>
         </div>
     );
 });

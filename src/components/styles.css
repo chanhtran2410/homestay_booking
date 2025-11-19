@@ -1,0 +1,552 @@
+/* ============================================
+   SHARED COMPONENT STYLES
+   Consistent styling for all component pages
+   ============================================ */
+
+/* Base Page Styles */
+.content-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f0f9f0 0%, #f8fdf8 50%, #f5fbf5 100%);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 40px 20px;
+    overflow-x: hidden;
+}
+
+/* Page Wrapper */
+.page-wrapper {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: linear-gradient(145deg, #ffffff 0%, #fafdfb 100%);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 8px 32px rgba(139, 187, 139, 0.12);
+    border: 2px solid rgba(168, 212, 168, 0.2);
+}
+
+/* Back Button Styles */
+.back-button,
+.ant-btn-text {
+    color: #5a9a5a !important;
+    font-weight: 500 !important;
+    padding: 8px 16px !important;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 25px !important;
+    transition: all 0.3s ease;
+    margin-bottom: 20px;
+}
+
+.back-button:hover,
+.ant-btn-text:hover {
+    background: linear-gradient(135deg, #e8f4e8 0%, #d4edd4 100%) !important;
+    transform: translateX(-3px);
+}
+
+/* Page Titles */
+.ant-typography h3,
+.page-title {
+    color: #5a9a5a !important;
+    font-weight: 600 !important;
+    font-size: 32px !important;
+    margin-bottom: 30px !important;
+    text-shadow: 1px 1px 3px rgba(90, 154, 90, 0.1);
+    position: relative;
+    padding-bottom: 15px;
+}
+
+.ant-typography h3::after,
+.page-title::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 60px;
+    height: 4px;
+    background: linear-gradient(135deg, #7bb87b 0%, #a8d4a8 100%);
+    border-radius: 2px;
+}
+
+/* Form Styles */
+.ant-form {
+    margin-top: 20px;
+}
+
+.ant-form-item {
+    margin-bottom: 24px;
+}
+
+.ant-form-item-label>label {
+    color: #2c5e2c !important;
+    font-weight: 600 !important;
+    font-size: 15px !important;
+}
+
+.ant-input,
+.ant-input-number,
+.ant-picker,
+.ant-select-selector {
+    border-radius: 12px !important;
+    border: 2px solid #d4edd4 !important;
+    transition: all 0.3s ease !important;
+}
+
+.ant-input:hover,
+.ant-input-number:hover,
+.ant-picker:hover,
+.ant-select-selector:hover {
+    border-color: #a8d4a8 !important;
+}
+
+.ant-input:focus,
+.ant-input-number:focus,
+.ant-picker-focused,
+.ant-select-focused .ant-select-selector {
+    border-color: #7bb87b !important;
+    box-shadow: 0 0 0 2px rgba(123, 184, 123, 0.1) !important;
+}
+
+/* Button Styles */
+.ant-btn-primary {
+    background: linear-gradient(135deg, #7bb87b 0%, #5a9a5a 100%) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    height: 42px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 12px rgba(123, 184, 123, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+.ant-btn-primary:hover {
+    background: linear-gradient(135deg, #6aa66a 0%, #4a8a4a 100%) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(123, 184, 123, 0.4) !important;
+}
+
+.ant-btn-default {
+    border: 2px solid #a8d4a8 !important;
+    color: #5a9a5a !important;
+    border-radius: 12px !important;
+    height: 42px !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+}
+
+.ant-btn-default:hover {
+    border-color: #7bb87b !important;
+    color: #4a8a4a !important;
+    background: #f0f9f0 !important;
+}
+
+.ant-btn-dangerous {
+    background: linear-gradient(135deg, #ff7875 0%, #ff4d4f 100%) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    height: 42px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 12px rgba(255, 77, 79, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+.ant-btn-dangerous:hover {
+    background: linear-gradient(135deg, #ff6b6b 0%, #f5222d 100%) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 77, 79, 0.4) !important;
+}
+
+/* Card Styles */
+.ant-card {
+    border-radius: 20px !important;
+    border: 2px solid rgba(168, 212, 168, 0.2) !important;
+    box-shadow: 0 8px 24px rgba(139, 187, 139, 0.1) !important;
+    transition: all 0.3s ease !important;
+}
+
+.ant-card:hover {
+    border-color: #a8d4a8 !important;
+    box-shadow: 0 12px 32px rgba(139, 187, 139, 0.15) !important;
+    transform: translateY(-4px);
+}
+
+.ant-card-head {
+    background: linear-gradient(135deg, #f0f9f0 0%, #e8f4e8 100%) !important;
+    border-bottom: 2px solid #d4edd4 !important;
+    border-radius: 18px 18px 0 0 !important;
+}
+
+.ant-card-head-title {
+    color: #2c5e2c !important;
+    font-weight: 600 !important;
+    font-size: 18px !important;
+}
+
+/* Tag Styles */
+.ant-tag {
+    border-radius: 8px !important;
+    padding: 4px 12px !important;
+    font-weight: 500 !important;
+    border: none !important;
+    background: linear-gradient(135deg, #f0f0f0 0%, #c5c5c5 100%) !important;
+
+}
+
+.ant-tag-success {
+    background: linear-gradient(135deg, #d6ffb7 0%, #b7ff87 100%) !important;
+    color: #389e0d !important;
+}
+
+.ant-tag-error {
+    background: linear-gradient(135deg, #ffccc7 0%, #ffaca8 100%) !important;
+    color: #cf1322 !important;
+}
+
+.ant-tag-warning {
+    background: linear-gradient(135deg, #ffe7ba 0%, #ffd591 100%) !important;
+    color: #d46b08 !important;
+}
+
+.ant-tag-processing {
+    background: linear-gradient(135deg, #bae7ff 0%, #91d5ff 100%) !important;
+    color: #0958d9 !important;
+}
+
+/* List Styles */
+.ant-list-item {
+    border-radius: 12px !important;
+    padding: 16px !important;
+    margin-bottom: 12px !important;
+    background: linear-gradient(145deg, #ffffff 0%, #fafdfb 100%) !important;
+    border: 2px solid rgba(168, 212, 168, 0.1) !important;
+    transition: all 0.3s ease !important;
+}
+
+.ant-list-item:hover {
+    border-color: #a8d4a8 !important;
+    box-shadow: 0 4px 12px rgba(139, 187, 139, 0.1) !important;
+    transform: translateX(4px);
+}
+
+/* Table Styles */
+.ant-table {
+    border-radius: 16px !important;
+    overflow: hidden !important;
+}
+
+.ant-table-measure-row {
+    display: none;
+}
+
+.ant-table-thead>tr>th {
+    border: 1px solid #7bb87b !important;
+    background: linear-gradient(135deg, #7bb87b 0%, #81dd81 100%) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    border: none !important;
+    padding: 16px !important;
+}
+
+.ant-table-tbody>tr {
+    transition: all 0.3s ease !important;
+}
+
+.ant-table-tbody>tr:hover {
+    background: linear-gradient(135deg, #f0f9f0 0%, #e8f4e8 100%) !important;
+}
+
+.ant-table-tbody>tr>td {
+    border-bottom: 1px solid #f0f0f0 !important;
+    padding: 16px !important;
+}
+
+/* Modal Styles */
+.ant-modal-content {
+    border-radius: 20px !important;
+    overflow: hidden !important;
+}
+
+.ant-modal-header {
+    background: linear-gradient(135deg, #7bb87b 0%, #5a9a5a 100%) !important;
+    border-bottom: none !important;
+    padding: 24px !important;
+}
+
+.ant-modal-title {
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 20px !important;
+}
+
+.ant-modal-close {
+    color: white !important;
+}
+
+.ant-modal-body {
+    padding: 32px !important;
+}
+
+.ant-modal-footer {
+    border-top: 2px solid #f0f0f0 !important;
+    padding: 16px 24px !important;
+}
+
+/* Result Display */
+.result-display {
+    margin-top: 24px;
+    padding: 20px;
+    background: linear-gradient(145deg, #ffffff 0%, #f0f9f0 100%);
+    border-radius: 16px;
+    border: 2px solid #a8d4a8;
+    box-shadow: 0 4px 12px rgba(139, 187, 139, 0.1);
+}
+
+.result-text {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #2c5e2c !important;
+    margin: 0 !important;
+}
+
+/* Loading State */
+.loading-overlay {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+}
+
+.ant-spin {
+    color: #5a9a5a !important;
+}
+
+/* Empty State */
+.ant-empty-description {
+    color: #5a9a5a !important;
+    font-size: 16px !important;
+}
+
+/* Message Customization */
+.ant-message-success {
+    background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%) !important;
+}
+
+.ant-message-error {
+    background: linear-gradient(135deg, #fff2f0 0%, #ffccc7 100%) !important;
+}
+
+/* Select Dropdown */
+.ant-select-dropdown {
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(139, 187, 139, 0.15) !important;
+}
+
+.ant-select-item-option-selected {
+    background: linear-gradient(135deg, #f0f9f0 0%, #e8f4e8 100%) !important;
+    color: #2c5e2c !important;
+    font-weight: 600 !important;
+}
+
+.ant-select-item-option-active {
+    background: #f0f9f0 !important;
+}
+
+/* DatePicker Dropdown */
+.ant-picker-panel-container {
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(139, 187, 139, 0.15) !important;
+}
+
+.ant-picker-cell-selected .ant-picker-cell-inner {
+    background: linear-gradient(135deg, #7bb87b 0%, #5a9a5a 100%) !important;
+}
+
+.ant-picker-cell-today .ant-picker-cell-inner::before {
+    border-color: #5a9a5a !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .content-container {
+        padding: 20px 12px;
+    }
+
+    .page-wrapper {
+        padding: 24px;
+    }
+
+    .ant-typography h3,
+    .page-title {
+        font-size: 24px !important;
+    }
+
+    .ant-form-item {
+        margin-bottom: 20px;
+    }
+
+    .ant-btn {
+        height: 38px !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .page-wrapper {
+        padding: 20px;
+        border-radius: 12px;
+    }
+
+    .ant-typography h3,
+    .page-title {
+        font-size: 20px !important;
+    }
+
+    .ant-card {
+        border-radius: 12px !important;
+    }
+}
+
+/* Custom Classes for Specific Components */
+
+/* Booking Success/Error Messages */
+.booking-success {
+    padding: 16px;
+    background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
+    border-left: 4px solid #52c41a;
+    border-radius: 12px;
+    margin-top: 16px;
+}
+
+.booking-error {
+    padding: 16px;
+    background: linear-gradient(135deg, #fff2f0 0%, #ffccc7 100%);
+    border-left: 4px solid #ff4d4f;
+    border-radius: 12px;
+    margin-top: 16px;
+}
+
+/* Room Status Cards */
+.room-status-card {
+    border-radius: 16px !important;
+    margin-bottom: 16px;
+    transition: all 0.3s ease;
+}
+
+.room-status-card.available {
+    border-left: 5px solid #52c41a !important;
+    background: linear-gradient(145deg, #ffffff 0%, #f6ffed 100%) !important;
+}
+
+.room-status-card.booked {
+    border-left: 5px solid #ff4d4f !important;
+    background: linear-gradient(145deg, #ffffff 0%, #fff2f0 100%) !important;
+}
+
+.room-status-card.pending {
+    border-left: 5px solid #faad14 !important;
+    background: linear-gradient(145deg, #ffffff 0%, #fffbe6 100%) !important;
+}
+
+/* Statistics Cards */
+.stat-card {
+    text-align: center;
+    padding: 24px;
+    border-radius: 16px !important;
+    background: linear-gradient(145deg, #ffffff 0%, #f0f9f0 100%);
+    border: 2px solid #a8d4a8 !important;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 32px rgba(139, 187, 139, 0.2) !important;
+}
+
+.stat-number {
+    font-size: 36px;
+    font-weight: 700;
+    color: #5a9a5a;
+    margin: 12px 0;
+}
+
+.stat-label {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+}
+
+/* Icon Styles */
+.anticon {
+    transition: all 0.3s ease;
+}
+
+.anticon:hover {
+    transform: scale(1.1);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.slide-in {
+    animation: slideIn 0.5s ease;
+}
+
+/* Utility Classes */
+.text-center {
+    text-align: center;
+}
+
+.text-success {
+    color: #52c41a !important;
+}
+
+.text-error {
+    color: #ff4d4f !important;
+}
+
+.text-warning {
+    color: #faad14 !important;
+}
+
+.text-primary {
+    color: #5a9a5a !important;
+}
+
+.mb-16 {
+    margin-bottom: 16px !important;
+}
+
+.mb-24 {
+    margin-bottom: 24px !important;
+}
+
+.mt-16 {
+    margin-top: 16px !important;
+}
+
+.mt-24 {
+    margin-top: 24px !important;
+}
