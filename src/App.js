@@ -347,13 +347,17 @@ const AuthProvider = ({ children }) => {
                         <GoogleOutlined
                             style={{
                                 fontSize: 24,
-                                color: '#4285f4',
+                                color: '#fff',
                                 marginRight: 8,
                             }}
                         />
                         <Title
                             level={4}
-                            style={{ margin: 0, display: 'inline' }}
+                            style={{
+                                margin: 0,
+                                display: 'inline',
+                                color: '#fff',
+                            }}
                         >
                             Đăng nhập để tiếp tục
                         </Title>
@@ -366,7 +370,12 @@ const AuthProvider = ({ children }) => {
                 centered
                 width={400}
             >
-                <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div
+                    style={{
+                        textAlign: 'center',
+                        padding: '20px 0',
+                    }}
+                >
                     <Text
                         style={{
                             fontSize: 16,
