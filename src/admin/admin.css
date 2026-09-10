@@ -1768,6 +1768,72 @@ button.ad-row:active {
     background: rgba(243, 239, 229, 0.12);
 }
 
+.ad-login__alert {
+    margin-top: 20px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: rgba(250, 234, 231, 0.94);
+    border: 1px solid #eecdc7;
+    color: var(--ad-book-fg);
+    font-size: 14px;
+    line-height: 1.65;
+    animation: ad-rise var(--ad-slow) var(--ad-ease-out) 0.16s both;
+}
+
+.ad-login__alert code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+    background: rgba(20, 30, 23, 0.08);
+    padding: 1px 5px;
+    border-radius: 5px;
+}
+
+.ad-login__form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 22px;
+    animation: ad-rise var(--ad-slow) var(--ad-ease-out) both;
+}
+
+.ad-login__label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #dbe3d3;
+}
+
+.ad-login__input {
+    width: 100%;
+    min-height: 52px;
+    padding: 14px 16px;
+    border-radius: 13px;
+    border: 1.5px solid rgba(243, 239, 229, 0.4);
+    background: rgba(20, 30, 23, 0.45);
+    color: var(--ad-on-dark);
+    font: inherit;
+    font-size: 15px;
+    outline: none;
+    transition: border-color var(--ad-fast) var(--ad-ease),
+        box-shadow var(--ad-fast) var(--ad-ease);
+}
+
+.ad-login__input::placeholder {
+    color: rgba(243, 239, 229, 0.5);
+}
+
+.ad-login__input:focus {
+    border-color: var(--ad-cream);
+    box-shadow: 0 0 0 4px rgba(243, 239, 229, 0.16);
+}
+
+.ad-login__form .ad-login__google {
+    margin-top: 6px;
+    animation: none;
+}
+
 .ad-login__foot {
     display: flex;
     align-items: center;

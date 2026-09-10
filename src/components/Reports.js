@@ -7,16 +7,15 @@ import { Btn, Loading } from '../admin/ui';
 import {
     compactVnd,
     formatVnd,
-    readSheet,
-    SHEET_NAME,
-    SHEET_URL,
-} from '../admin/sheets';
-import { readMonth } from '../admin/revenue';
+    getMonth,
+    DATA_SOURCE,
+    shortRoomName,
+} from '../admin/api';
 
 const csvEscape = (cell) => `"${String(cell).replace(/"/g, '""')}"`;
 
 const Reports = () => {
-    const { isSignedIn, makeApiCall } = useAuth();
+    const { isSignedIn } = useAuth();
     const [month, setMonth] = useState(dayjs());
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState(null);
@@ -25,8 +24,7 @@ const Reports = () => {
         async (target) => {
             setLoading(true);
             try {
-                const { data, headers } = await readSheet(makeApiCall);
-                setView(readMonth(data, headers, target));
+                setView(await getMonth(target));
             } catch (error) {
                 console.error('Error loading report:', error);
                 message.error(
@@ -36,7 +34,7 @@ const Reports = () => {
                 setLoading(false);
             }
         },
-        [makeApiCall]
+        []
     );
 
     useEffect(() => {
@@ -48,7 +46,7 @@ const Reports = () => {
         const rows = [
             ['Phòng', 'Mã', 'Đêm đã cọc', 'Doanh thu (VND)'],
             ...view.perRoom.map(({ room, revenue }) => [
-                room.label.split(' - ')[1] || room.label,
+                shortRoomName(room.label),
                 room.value,
                 view.rows.find((r) => r.room.value === room.value).cells.filter(
                     (cell) => cell.kind === 'booked'
@@ -154,10 +152,7 @@ const Reports = () => {
                         {view.perRoom.map(({ room, revenue }, index) => (
                             <div key={room.value}>
                                 <div className="ad-bars__head">
-                                    <span>
-                                        {room.label.split(' - ')[1] ||
-                                            room.label}
-                                    </span>
+                                    <span>{shortRoomName(room.label)}</span>
                                     <span className="ad-bars__amt ad-num">
                                         {formatVnd(revenue)}
                                     </span>
@@ -191,9 +186,9 @@ const Reports = () => {
                             style={{ marginTop: 9, lineHeight: 1.7 }}
                         >
                             Số liệu tính từ các ô có trạng thái “Đã đặt cọc”
-                            trên {SHEET_NAME}, theo bảng giá ngày thường / cuối
-                            tuần của từng phòng. Bảng tính không đánh dấu ngày
-                            lễ nên giá lễ chưa được áp dụng.
+                            theo giá đã chốt tại thời điểm đặt của từng đêm,
+                            nên đổi bảng giá về sau không làm thay đổi số liệu
+                            các tháng đã qua.
                         </p>
                     </div>
 
@@ -205,13 +200,13 @@ const Reports = () => {
                             variant="quiet"
                             onClick={() =>
                                 window.open(
-                                    SHEET_URL,
+                                    DATA_SOURCE.url,
                                     '_blank',
                                     'noopener,noreferrer'
                                 )
                             }
                         >
-                            Mở Sheet
+                            Mở database
                         </Btn>
                     </div>
                 </>

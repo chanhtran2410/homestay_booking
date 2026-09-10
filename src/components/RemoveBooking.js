@@ -1,6 +1,5 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { message } from 'antd';
-import { useAuth } from '../App';
 import AdminShell from '../admin/AdminShell';
 import {
     Btn,
@@ -10,32 +9,35 @@ import {
     useBusy,
 } from '../admin/ui';
 import {
-    availableDates,
-    cellAt,
-    columnLetter,
-    findDateColumn,
-    findRoomRow,
-    readSheet,
-    SHEET_NAME,
-    SPREADSHEET_ID,
-} from '../admin/sheets';
-import { ROOM_OPTIONS } from '../constants/roomOptions';
+    deleteBooking,
+    deleteNight,
+    findBooking,
+    formatVnd,
+    getRooms,
+    toApiDate,
+} from '../admin/api';
 
 const STEPS = [
     'Chọn phòng và ngày cần xoá',
     'Bấm tìm booking, đối chiếu tên khách',
+    'Chọn xoá một đêm hoặc xoá cả kỳ lưu trú',
     'Xác nhận lần hai trong hộp thoại',
-    `Ô trên ${SHEET_NAME} được ghi rỗng`,
 ];
 
 const RemoveBooking = () => {
-    const { makeApiCall } = useAuth();
+    const [rooms, setRooms] = useState([]);
     const [roomId, setRoomId] = useState(null);
     const [date, setDate] = useState(null);
-    const [booking, setBooking] = useState(null);
+    const [found, setFound] = useState(null);
     const [emptyCell, setEmptyCell] = useState(false);
-    const [confirming, setConfirming] = useState(false);
+    const [confirming, setConfirming] = useState(null); // 'night' | 'stay'
     const [busy, run] = useBusy();
+
+    useEffect(() => {
+        getRooms()
+            .then((data) => setRooms(data.options))
+            .catch(() => setRooms([]));
+    }, []);
 
     const onFind = useCallback(async () => {
         if (!roomId) {
@@ -48,55 +50,18 @@ const RemoveBooking = () => {
         }
 
         await run(async () => {
-            setBooking(null);
+            setFound(null);
             setEmptyCell(false);
             try {
-                const { data, headers } = await readSheet(makeApiCall);
-                const { index: dateIndex, format } = findDateColumn(
-                    headers,
-                    date
-                );
-
-                if (dateIndex === -1) {
-                    message.error(
-                        `Không tìm thấy ngày trong bảng tính. Các cột đang có: ${availableDates(
-                            headers
-                        )
-                            .slice(0, 12)
-                            .join(', ')}`
-                    );
-                    return;
-                }
-
-                const roomRowIndex = findRoomRow(data, roomId);
-                if (roomRowIndex === -1) {
-                    message.error(
-                        `Không tìm thấy phòng "${roomId}" trong bảng tính`
-                    );
-                    return;
-                }
-
-                const value = cellAt(data, roomRowIndex, dateIndex);
-                if (value.trim() === '') {
+                const data = await findBooking(roomId, date);
+                if (!data.found) {
                     setEmptyCell(true);
                     message.info(
-                        `Phòng ${roomId} ngày ${format} hiện đang trống`
+                        `Phòng ${roomId} ngày ${toApiDate(date)} hiện đang trống`
                     );
                     return;
                 }
-
-                const room = ROOM_OPTIONS.find(
-                    (option) => option.value === roomId
-                );
-                setBooking({
-                    roomId,
-                    roomLabel: room?.label || roomId,
-                    date: format,
-                    dateIndex,
-                    roomRowIndex,
-                    value,
-                    columnLetter: columnLetter(dateIndex),
-                });
+                setFound(data);
                 message.success('Đã tìm thấy booking cần xoá');
             } catch (error) {
                 console.error('Error checking booking:', error);
@@ -106,25 +71,29 @@ const RemoveBooking = () => {
                 );
             }
         });
-    }, [roomId, date, makeApiCall, run]);
+    }, [roomId, date, run]);
 
     const onRemove = useCallback(async () => {
-        if (!booking) return;
+        if (!found) return;
+        const scope = confirming;
+
         await run(async () => {
             try {
-                await makeApiCall(() =>
-                    window.gapi.client.sheets.spreadsheets.values.update({
-                        spreadsheetId: SPREADSHEET_ID,
-                        range: `${SHEET_NAME}!${booking.columnLetter}${
-                            booking.roomRowIndex + 1
-                        }`,
-                        valueInputOption: 'RAW',
-                        resource: { values: [['']] },
-                    })
+                const result =
+                    scope === 'stay'
+                        ? await deleteBooking(found.booking.id)
+                        : await deleteNight(roomId, date);
+
+                message.success(
+                    scope === 'stay'
+                        ? `Đã xoá cả kỳ lưu trú (${result.nightsDeleted} đêm)`
+                        : result.bookingDeleted
+                        ? 'Đã xoá đêm cuối cùng, booking cũng được xoá theo'
+                        : `Đã xoá 1 đêm, còn lại ${result.nightsLeft} đêm`
                 );
-                message.success('Đã xoá booking thành công!');
-                setBooking(null);
-                setConfirming(false);
+
+                setFound(null);
+                setConfirming(null);
                 setRoomId(null);
                 setDate(null);
             } catch (error) {
@@ -134,20 +103,23 @@ const RemoveBooking = () => {
                 );
             }
         });
-    }, [booking, makeApiCall, run]);
+    }, [found, confirming, roomId, date, run]);
+
+    const booking = found?.booking;
+    const multiNight = booking && booking.nights > 1;
 
     return (
-        <AdminShell
-            back
-            eyebrow="KHÔNG THỂ HOÀN TÁC"
-            title="Xoá đặt phòng"
-        >
+        <AdminShell back eyebrow="KHÔNG THỂ HOÀN TÁC" title="Xoá đặt phòng">
             <div className="ad-cols">
                 <div>
                     <div style={{ display: 'flex', gap: 10 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                             <label className="ad-label">Phòng</label>
-                            <RoomSelect value={roomId} onChange={setRoomId} />
+                            <RoomSelect
+                                options={rooms}
+                                value={roomId}
+                                onChange={setRoomId}
+                            />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                             <label className="ad-label">Ngày</label>
@@ -185,71 +157,102 @@ const RemoveBooking = () => {
                     )}
 
                     {booking && (
-                        <div
-                            style={{
-                                marginTop: 20,
-                                borderRadius: 16,
-                                overflow: 'hidden',
-                                border: '1px solid #F0D9D5',
-                            }}
-                        >
+                        <>
                             <div
                                 style={{
-                                    padding: '16px 18px',
-                                    background: 'var(--ad-book-bg)',
+                                    marginTop: 20,
+                                    borderRadius: 16,
+                                    overflow: 'hidden',
+                                    border: '1px solid #eecdc7',
                                 }}
                             >
                                 <div
-                                    className="ad-card__k"
-                                    style={{ color: 'var(--ad-book-fg)' }}
+                                    style={{
+                                        padding: '16px 18px',
+                                        background: 'var(--ad-book-bg)',
+                                    }}
                                 >
-                                    TÌM THẤY BOOKING
+                                    <div
+                                        className="ad-card__k"
+                                        style={{ color: 'var(--ad-book-fg)' }}
+                                    >
+                                        TÌM THẤY BOOKING
+                                    </div>
+                                    <div
+                                        className="ad-display"
+                                        style={{ fontSize: 20, marginTop: 8 }}
+                                    >
+                                        {booking.guestName}
+                                    </div>
                                 </div>
                                 <div
-                                    className="ad-display"
-                                    style={{ fontSize: 20, marginTop: 8 }}
+                                    className="ad-kv"
+                                    style={{
+                                        background: 'var(--ad-paper)',
+                                        padding: '16px 18px',
+                                    }}
                                 >
-                                    {booking.value.split('-')[0].trim()}
+                                    <div>
+                                        <div className="ad-kv__k">Phòng</div>
+                                        <div className="ad-kv__v">
+                                            {found.room.label}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="ad-kv__k">Ngày</div>
+                                        <div className="ad-kv__v ad-num">
+                                            {found.date}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="ad-kv__k">
+                                            Kỳ lưu trú
+                                        </div>
+                                        <div className="ad-kv__v ad-num">
+                                            {booking.checkIn} · {booking.nights}{' '}
+                                            đêm
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="ad-kv__k">Tiền cọc</div>
+                                        <div className="ad-kv__v ad-num">
+                                            {booking.deposit
+                                                ? formatVnd(booking.deposit)
+                                                : '—'}
+                                        </div>
+                                    </div>
+                                    {booking.note && (
+                                        <div className="ad-kv__wide">
+                                            <div className="ad-kv__k">
+                                                Ghi chú
+                                            </div>
+                                            <div className="ad-kv__v">
+                                                {booking.note}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            <div
-                                className="ad-kv"
-                                style={{
-                                    background: 'var(--ad-paper)',
-                                    padding: '16px 18px',
-                                }}
-                            >
-                                <div>
-                                    <div className="ad-kv__k">Phòng</div>
-                                    <div className="ad-kv__v">
-                                        {booking.roomLabel}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="ad-kv__k">Ngày</div>
-                                    <div className="ad-kv__v ad-num">
-                                        {booking.date}
-                                    </div>
-                                </div>
-                                <div className="ad-kv__wide">
-                                    <div className="ad-kv__k">Chi tiết ô</div>
-                                    <div className="ad-kv__v">
-                                        {booking.value}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
-                    {booking && (
-                        <Btn
-                            variant="danger"
-                            block
-                            style={{ marginTop: 14 }}
-                            onClick={() => setConfirming(true)}
-                        >
-                            Xoá booking này
-                        </Btn>
+                            <div className="ad-actions">
+                                <Btn
+                                    variant="danger"
+                                    grow
+                                    onClick={() => setConfirming('night')}
+                                >
+                                    Xoá đêm này
+                                </Btn>
+                                {multiNight && (
+                                    <Btn
+                                        variant="quiet"
+                                        grow
+                                        onClick={() => setConfirming('stay')}
+                                    >
+                                        Xoá cả {booking.nights} đêm
+                                    </Btn>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
 
@@ -266,25 +269,38 @@ const RemoveBooking = () => {
                                 </li>
                             ))}
                         </ol>
+                        <p className="ad-hint" style={{ marginTop: 14 }}>
+                            Mọi thao tác xoá đều được ghi lại trong bảng
+                            booking_audit, nên vẫn khôi phục được bằng tay nếu
+                            xoá nhầm.
+                        </p>
                     </div>
                 </div>
             </div>
 
             {confirming && booking && (
                 <ConfirmSheet
-                    title="Xoá booking này?"
+                    title={
+                        confirming === 'stay'
+                            ? 'Xoá cả kỳ lưu trú?'
+                            : 'Xoá đêm này?'
+                    }
                     busy={busy}
+                    confirmLabel={confirming === 'stay' ? 'Xoá cả kỳ' : 'Xoá'}
                     body={
                         <>
-                            {booking.roomLabel} · {booking.date} ·{' '}
-                            {booking.value}
+                            {found.room.label} · {booking.guestName}
+                            <br />
+                            {confirming === 'stay'
+                                ? `Toàn bộ ${booking.nights} đêm từ ${booking.checkIn}.`
+                                : `Chỉ đêm ${found.date}. Các đêm khác của kỳ này giữ nguyên.`}
                             <br />
                             <b style={{ color: 'var(--ad-book-fg)' }}>
                                 Hành động này không thể hoàn tác.
                             </b>
                         </>
                     }
-                    onCancel={() => setConfirming(false)}
+                    onCancel={() => setConfirming(null)}
                     onConfirm={onRemove}
                 />
             )}

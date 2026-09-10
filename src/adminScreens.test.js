@@ -10,9 +10,6 @@ import {
 import dayjs from 'dayjs';
 import { message } from 'antd';
 
-const mockApiCall = jest.fn((fn) => fn());
-const mockLogout = jest.fn();
-
 // react-router-dom v7 chỉ khai báo "exports" map, jest 27 của CRA không phân giải được.
 jest.mock(
     'react-router-dom',
@@ -26,12 +23,31 @@ jest.mock(
 jest.mock('./App', () => ({
     useAuth: () => ({
         isSignedIn: true,
-        user: { email: 'bao@gmail.com' },
-        loginTime: Date.now(),
-        makeApiCall: mockApiCall,
-        handleLogout: mockLogout,
+        user: { email: 'bao@example.com', role: 'owner', fullName: 'Bảo' },
+        expiresAt: Date.now() + 3600_000,
+        handleLogout: () => {},
     }),
 }));
+
+// Tầng dữ liệu giờ là HTTP tới /api, không còn window.gapi.
+// Mock đúng module này thay vì giả lập mạng.
+jest.mock('./admin/api', () => {
+    const actual = jest.requireActual('./admin/api');
+    return {
+        ...actual,
+        getRooms: jest.fn(),
+        getMonth: jest.fn(),
+        getDashboard: jest.fn(),
+        getAvailability: jest.fn(),
+        findBooking: jest.fn(),
+        createBooking: jest.fn(),
+        deleteNight: jest.fn(),
+        deleteBooking: jest.fn(),
+        getPublicRooms: jest.fn(),
+    };
+});
+
+const api = require('./admin/api');
 
 const Home = require('./Home/Home').default;
 const Booking = require('./components/Booking').default;
@@ -40,33 +56,105 @@ const RoomAvailability = require('./components/RoomAvailability').default;
 const DateRoomChecker = require('./components/DateRoomChecker').default;
 const RemoveBooking = require('./components/RemoveBooking').default;
 const Reports = require('./components/Reports').default;
-const { classify, parseCell, parseAmount } = require('./admin/sheets');
-const { readMonth } = require('./admin/revenue');
 
-// --- bảng tính giả: 6 phòng × mọi ngày của tháng hiện tại ------------------
-const month = dayjs();
-const days = Array.from({ length: month.endOf('month').date() }, (_, i) =>
-    month.startOf('month').date(i + 1)
-);
-const headers = ['Tên phòng', 'Mã', ...days.map((d) => d.format('DD/MM/YYYY'))];
+/* ------------------------------------------------------------------ *
+ * Dữ liệu giả — đúng hình dạng mà /api trả về
+ * ------------------------------------------------------------------ */
+
+const OPTIONS = [
+    { value: '1001', label: '1001 - Bungalow Bằng Lăng', type: 'bungalow' },
+    { value: '1002', label: '1002 - Bungalow Nguyệt Quế', type: 'bungalow' },
+    { value: '1005', label: '1005 - Phòng số 2', type: 'room' },
+];
 
 const today = dayjs();
-const todayCol = 2 + (today.date() - 1);
+const month = today.format('YYYY-MM');
+const todayStr = today.format('YYYY-MM-DD');
 
-const blank = () => days.map(() => '');
+const cell = (date, overrides = {}) => ({
+    date: dayjs(date),
+    value: '',
+    kind: 'free',
+    ...overrides,
+});
 
-const rows = [
-    ['Bungalow Bằng Lăng', '1001', ...blank()],
-    ['Bungalow Nguyệt Quế', '1002', ...blank()],
-    ['Bungalow Giáng Hương', '1003', ...blank()],
-    ['Phòng số 2', '1005', ...blank()],
-    ['Phòng số 3', '1006', ...blank()],
-    // 1004 cố tình thiếu -> phải rơi vào nhóm "Không rõ"
+const monthView = () => {
+    const days = Array.from({ length: today.daysInMonth() }, (_, i) =>
+        today.startOf('month').add(i, 'day').format('YYYY-MM-DD')
+    );
+    return {
+        month,
+        columns: days.map((date, index) => ({ date: dayjs(date), index })),
+        rows: OPTIONS.map((room, roomIndex) => ({
+            room,
+            missing: false,
+            cells: days.map((date) =>
+                roomIndex === 0 && date === todayStr
+                    ? cell(date, {
+                          kind: 'booked',
+                          value: 'Anh Minh - Đã đặt cọc - 500.000',
+                          guestName: 'Anh Minh',
+                          deposit: 500000,
+                          nightlyRate: 800000,
+                          bookingId: 'b-1',
+                      })
+                    : cell(date)
+            ),
+        })),
+        counts: { free: 100, wait: 0, booked: 1, unknown: 0 },
+        total: 101,
+        revenue: 800000,
+        perRoom: OPTIONS.map((room, i) => ({
+            room,
+            revenue: i === 0 ? 800000 : 0,
+        })),
+        nightsSold: 1,
+        occupancy: 1,
+    };
+};
+
+const dayRows = () => [
+    {
+        room: OPTIONS[0],
+        kind: 'booked',
+        value: 'Anh Minh - Đã đặt cọc - 500.000',
+        detail: 'Anh Minh - Đã đặt cọc - 500.000',
+        meta: '4 khách · 45m²',
+        booking: {
+            id: 'b-1',
+            guestName: 'Anh Minh',
+            guestPhone: null,
+            note: null,
+            status: 'booked',
+            deposit: 500000,
+            checkIn: todayStr,
+            nights: 3,
+        },
+    },
+    {
+        room: OPTIONS[1],
+        kind: 'free',
+        value: '',
+        detail: '2 khách · 30m²',
+        meta: '2 khách · 30m²',
+        booking: null,
+    },
+    {
+        room: OPTIONS[2],
+        kind: 'wait',
+        value: 'Chị Hằng - Đang đợi đặt cọc',
+        detail: 'Chị Hằng - Đang đợi đặt cọc',
+        meta: '3 khách · 35m²',
+        booking: {
+            id: 'b-2',
+            guestName: 'Chị Hằng',
+            status: 'wait',
+            deposit: 0,
+            checkIn: todayStr,
+            nights: 1,
+        },
+    },
 ];
-rows[0][todayCol] = 'Anh Minh - Đã đặt cọc - 500.000';
-rows[1][todayCol] = 'Chị Hằng - Đang đợi đặt cọc';
-
-const SHEET = [headers, ...rows];
 
 beforeAll(() => {
     window.matchMedia =
@@ -83,156 +171,128 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-    mockApiCall.mockReset();
-    mockApiCall.mockImplementation((fn) => fn());
-    window.gapi = {
-        client: {
-            sheets: {
-                spreadsheets: {
-                    values: {
-                        get: jest.fn(async () => ({
-                            result: { values: SHEET },
-                        })),
-                        update: jest.fn(async () => ({})),
-                    },
-                    batchUpdate: jest.fn(async () => ({})),
-                },
-            },
-        },
-    };
+    // CRA bật resetMocks:true nên phải cài lại implementation mỗi test.
+    api.getRooms.mockReset().mockResolvedValue({ ok: true, options: OPTIONS });
+    api.getMonth.mockReset().mockResolvedValue(monthView());
+    api.getDashboard.mockReset().mockResolvedValue({
+        ok: true,
+        date: todayStr,
+        month,
+        today: dayRows(),
+        summary: monthView(),
+    });
+    api.getAvailability
+        .mockReset()
+        .mockResolvedValue({ ok: true, date: todayStr, rooms: dayRows() });
+    api.findBooking.mockReset();
+    api.createBooking.mockReset();
+    api.deleteNight.mockReset();
+    api.deleteBooking.mockReset();
 });
 
+afterEach(() => message.destroy());
 
-// Nhập ngày vào DatePicker của antd.
 const typeDate = (input, text) => {
     fireEvent.mouseDown(input);
     fireEvent.change(input, { target: { value: text } });
     fireEvent.keyDown(input, { key: 'Enter', keyCode: 13 });
 };
 
-const draw = (ui) => render(ui);
+/* ================================================================== */
 
-afterEach(() => message.destroy());
-
-/* ========================================================================== */
-
-describe('logic dùng chung', () => {
-    test('phân loại nội dung ô', () => {
-        expect(classify('')).toBe('free');
-        expect(classify('   ')).toBe('free');
-        expect(classify('Anh Minh - Đã đặt cọc - 500.000')).toBe('booked');
-        expect(classify('Chị Hằng - Đang đợi đặt cọc')).toBe('wait');
-        expect(classify('Chị Hằng - chờ cọc')).toBe('wait');
-    });
-
-    test('tách tên khách và tiền cọc', () => {
-        const parsed = parseCell('Anh Minh - Đã đặt cọc - 500.000');
-        expect(parsed.customerName).toBe('Anh Minh');
-        expect(parsed.deposit).toBe('500.000');
-        expect(parsed.status).toBe('Đã đặt cọc');
-    });
-
+describe('hàm thuần', () => {
     test('đọc số tiền', () => {
-        expect(parseAmount('500.000')).toBe(500000);
-        expect(parseAmount('500')).toBe(500000);
-        expect(parseAmount('')).toBe(0);
+        expect(api.parseAmount('500.000')).toBe(500000);
+        expect(api.parseAmount('500')).toBe(500000);
+        expect(api.parseAmount('')).toBe(0);
     });
 
-    test('tổng hợp tháng: đếm ô và tính doanh thu', () => {
-        const view = readMonth(SHEET, headers, month);
-        expect(view.rows).toHaveLength(6);
-        expect(view.columns).toHaveLength(days.length);
+    test('rút gọn tên phòng', () => {
+        expect(api.shortRoomName('1001 - Bungalow Bằng Lăng')).toBe(
+            'Bungalow Bằng Lăng'
+        );
+        expect(api.shortRoomName('')).toBe('');
+    });
 
-        // phòng 1004 không có trong bảng tính -> cả tháng là "không rõ"
-        expect(view.counts.unknown).toBe(days.length);
-        expect(view.counts.booked).toBe(1);
-        expect(view.counts.wait).toBe(1);
+    test('định dạng tiền', () => {
+        expect(api.formatVnd(500000)).toBe('500.000₫');
+        expect(api.compactVnd(24600000)).toBe('24,6tr');
+        expect(api.compactVnd(600000)).toBe('600k');
+    });
 
-        // doanh thu = giá 1 đêm của 1001 theo thứ trong tuần
-        const weekend = today.day() === 0 || today.day() === 6;
-        expect(view.revenue).toBe(weekend ? 1000000 : 800000);
-        expect(view.nightsSold).toBe(1);
+    test('gửi ngày lên API luôn là YYYY-MM-DD', () => {
+        // Server chạy ở UTC, người dùng ở UTC+7 -> client phải nói rõ ngày.
+        expect(api.toApiDate(dayjs('2026-09-12'))).toBe('2026-09-12');
+        expect(api.toApiMonth(dayjs('2026-09-12'))).toBe('2026-09');
     });
 });
 
 describe('các màn hình quản lý', () => {
     test('Tổng quan hiển thị tình trạng hôm nay', async () => {
-        draw(<Home />);
+        render(<Home />);
         expect(await screen.findByText('Tình trạng hôm nay')).toBeInTheDocument();
         expect(await screen.findByText(/Anh Minh · đã cọc/)).toBeInTheDocument();
         expect(await screen.findByText(/Chị Hằng · chờ cọc/)).toBeInTheDocument();
-        // 3 phòng trống + 1 phòng không có trong sheet
-        expect(document.querySelectorAll('.ad-row.is-free')).toHaveLength(3);
-        expect(document.querySelectorAll('.ad-row.is-unknown')).toHaveLength(1);
+        expect(document.querySelectorAll('.ad-row.is-free')).toHaveLength(1);
+
+        // Ngày được gửi tường minh, không để server tự đoán.
+        expect(api.getDashboard).toHaveBeenCalled();
     });
 
     test('Lịch tháng vẽ ma trận và mở chi tiết ô', async () => {
-        draw(<MonthChecker />);
+        render(<MonthChecker />);
         await waitFor(() =>
             expect(document.querySelector('.ad-mx__cell')).toBeInTheDocument()
         );
-        expect(document.querySelectorAll('.ad-mx__row')).toHaveLength(6);
+        expect(document.querySelectorAll('.ad-mx__row')).toHaveLength(3);
 
-        const booked = document.querySelector('.ad-mx__cell.is-booked');
-        expect(booked).toBeInTheDocument();
-        fireEvent.click(booked);
+        fireEvent.click(document.querySelector('.ad-mx__cell.is-booked'));
 
         expect(await screen.findByText('CHI TIẾT Ô ĐANG CHỌN')).toBeInTheDocument();
-        // "Anh Minh" có ở cả ô trong lịch lẫn thẻ chi tiết -> chỉ xét thẻ chi tiết
         const card = document.querySelector('.ad-card');
         expect(within(card).getByText('Anh Minh')).toBeInTheDocument();
         expect(within(card).getByText('500.000₫')).toBeInTheDocument();
-        expect(within(card).getByText('1001 - Bungalow Bằng Lăng')).toBeInTheDocument();
     });
 
     test('Báo cáo tính doanh thu theo phòng', async () => {
-        draw(<Reports />);
+        render(<Reports />);
         expect(await screen.findByText('Doanh thu theo phòng')).toBeInTheDocument();
-        expect(document.querySelectorAll('.ad-bars__fill')).toHaveLength(6);
+        expect(document.querySelectorAll('.ad-bars__fill')).toHaveLength(3);
     });
 
-    test('Đặt phòng: chọn phòng, xem trước, chặn thiếu dữ liệu', async () => {
-        draw(<Booking />);
+    test('Phòng trống theo ngày nhóm theo trạng thái', async () => {
+        const { container } = render(<DateRoomChecker />);
+        expect(screen.getByText(/Chọn một ngày rồi bấm/)).toBeInTheDocument();
 
-        fireEvent.click(screen.getByText('+ Chọn phòng'));
-        fireEvent.click(await screen.findByText('1001 - Bungalow Bằng Lăng'));
-        fireEvent.click(screen.getByText(/^Xong/));
-
-        expect(await screen.findByText(/1 ô/)).toBeInTheDocument();
-
-        // chưa chọn ngày -> không được gọi API
-        fireEvent.click(screen.getByText(/Ghi vào Sheet1/));
-        await waitFor(() =>
-            expect(
-                screen.getByText('Vui lòng chọn ngày nhận phòng')
-            ).toBeInTheDocument()
+        typeDate(
+            container.querySelector('.ad-date input'),
+            today.format('DD/MM/YYYY')
         );
-        expect(window.gapi.client.sheets.spreadsheets.batchUpdate).not.toHaveBeenCalled();
+        // Nút "Quét" nằm trong thanh tiêu đề, không nằm trong phần nội dung.
+        fireEvent.click(container.querySelector('.ad-top__actions .ad-btn--accent'));
+
+        expect(await screen.findByText('Phòng trống')).toBeInTheDocument();
+        expect(screen.getByText('Đã đặt')).toBeInTheDocument();
+        expect(screen.getByText('Đang đợi cọc')).toBeInTheDocument();
     });
 
     test('Kiểm tra phòng yêu cầu chọn phòng trước', async () => {
-        const { container } = draw(<RoomAvailability />);
+        const { container } = render(<RoomAvailability />);
         fireEvent.click(container.querySelector('.ad-content .ad-btn--accent'));
         expect(await screen.findByText('Vui lòng chọn phòng')).toBeInTheDocument();
+        expect(api.getAvailability).not.toHaveBeenCalled();
     });
+});
 
-    test('Phòng trống theo ngày hiện trạng thái rỗng ban đầu', () => {
-        draw(<DateRoomChecker />);
-        expect(
-            screen.getByText(/Chọn một ngày rồi bấm/)
-        ).toBeInTheDocument();
-    });
+describe('luồng ghi dữ liệu', () => {
+    test('Đặt phòng gửi đúng dữ liệu lên API', async () => {
+        api.createBooking.mockResolvedValue({
+            ok: true,
+            bookingIds: ['b-9'],
+            nightsWritten: 3,
+        });
 
-    test('Xoá đặt phòng yêu cầu chọn phòng trước', async () => {
-        draw(<RemoveBooking />);
-        fireEvent.click(screen.getByText('Tìm booking'));
-        expect(await screen.findByText('Vui lòng chọn phòng')).toBeInTheDocument();
-        expect(
-            window.gapi.client.sheets.spreadsheets.values.update
-        ).not.toHaveBeenCalled();
-    });
-    test('Đặt phòng ghi đúng chuỗi xuống Sheet', async () => {
-        const { container } = draw(<Booking />);
+        const { container } = render(<Booking />);
 
         fireEvent.click(screen.getByText('+ Chọn phòng'));
         fireEvent.click(await screen.findByText('1001 - Bungalow Bằng Lăng'));
@@ -247,40 +307,104 @@ describe('các màn hình quản lý', () => {
             { target: { value: 'Chị Vy' } }
         );
         fireEvent.change(
-            container.querySelector('input[placeholder="500.000"]'),
-            { target: { value: '700.000' } }
+            container.querySelector('input[placeholder="0903 664 474"]'),
+            { target: { value: '0912345678' } }
         );
+        fireEvent.change(container.querySelector('input[placeholder="500.000"]'), {
+            target: { value: '700.000' },
+        });
 
-        fireEvent.click(screen.getByText(/Ghi vào Sheet1/));
+        fireEvent.click(screen.getByText('Lưu đặt phòng'));
 
-        // ô hôm nay của 1001 đã có khách -> phải hỏi ghi đè trước
+        await waitFor(() => expect(api.createBooking).toHaveBeenCalled());
+        const payload = api.createBooking.mock.calls[0][0];
+        expect(payload.roomIds).toEqual(['1001']);
+        expect(payload.checkIn).toBe(todayStr);
+        expect(payload.guestName).toBe('Chị Vy');
+        expect(payload.guestPhone).toBe('0912345678');
+        expect(payload.status).toBe('booked');
+        expect(payload.deposit).toBe(700000);
+        expect(payload.overwrite).toBe(false); // lần đầu KHÔNG ghi đè
+    });
+
+    test('Đặt phòng: xung đột phải hỏi trước, ghi đè phải kèm token', async () => {
+        api.createBooking
+            .mockResolvedValueOnce({
+                ok: false,
+                code: 'conflict',
+                conflictToken: 'tok-abc',
+                conflicts: [
+                    {
+                        roomCode: '1001',
+                        date: todayStr,
+                        guestName: 'Anh Minh',
+                        status: 'booked',
+                    },
+                ],
+            })
+            .mockResolvedValueOnce({ ok: true, nightsWritten: 1 });
+
+        const { container } = render(<Booking />);
+
+        fireEvent.click(screen.getByText('+ Chọn phòng'));
+        fireEvent.click(await screen.findByText('1001 - Bungalow Bằng Lăng'));
+        fireEvent.click(screen.getByText(/^Xong/));
+        typeDate(
+            container.querySelector('.ad-date input'),
+            today.format('DD/MM/YYYY')
+        );
+        fireEvent.change(
+            container.querySelector('input[placeholder="Ví dụ: Anh Minh"]'),
+            { target: { value: 'Chị Vy' } }
+        );
+        fireEvent.change(container.querySelector('input[placeholder="500.000"]'), {
+            target: { value: '700.000' },
+        });
+
+        fireEvent.click(screen.getByText('Lưu đặt phòng'));
+
+        // Hộp xác nhận hiện ra, chưa ghi gì thêm
         const overwrite = await screen.findByText('Ghi đè tất cả');
-        expect(
-            window.gapi.client.sheets.spreadsheets.batchUpdate
-        ).not.toHaveBeenCalled();
+        expect(api.createBooking).toHaveBeenCalledTimes(1);
+        expect(screen.getByText(/Anh Minh/)).toBeInTheDocument();
 
         fireEvent.click(overwrite);
 
-        await waitFor(() =>
-            expect(
-                window.gapi.client.sheets.spreadsheets.batchUpdate
-            ).toHaveBeenCalled()
-        );
-        const [[args]] =
-            window.gapi.client.sheets.spreadsheets.batchUpdate.mock.calls;
-        const requests = args.resource.requests;
-        expect(requests).toHaveLength(1);
-        expect(
-            requests[0].updateCells.rows[0].values[0].userEnteredValue
-                .stringValue
-        ).toBe('Chị Vy - Đã đặt cọc - 700.000');
-        expect(requests[0].updateCells.range.startRowIndex).toBe(1); // hàng 1001
-        expect(requests[0].updateCells.range.startColumnIndex).toBe(todayCol);
+        await waitFor(() => expect(api.createBooking).toHaveBeenCalledTimes(2));
+        const second = api.createBooking.mock.calls[1][0];
+        expect(second.overwrite).toBe(true);
+        // Token của lần 1 phải được gửi lại, nếu không máy chủ có thể xoá
+        // nhầm booking mà người dùng chưa từng nhìn thấy.
+        expect(second.conflictToken).toBe('tok-abc');
     });
 
-    test('Xoá đặt phòng ghi rỗng đúng ô', async () => {
-        const { container } = draw(<RemoveBooking />);
+    test('Xoá đặt phòng: tìm rồi xoá đúng một đêm', async () => {
+        api.findBooking.mockResolvedValue({
+            ok: true,
+            found: true,
+            room: OPTIONS[0],
+            date: todayStr,
+            value: 'Anh Minh - Đã đặt cọc - 500.000',
+            booking: {
+                id: 'b-1',
+                guestName: 'Anh Minh',
+                status: 'booked',
+                deposit: 500000,
+                checkIn: todayStr,
+                nights: 3,
+            },
+        });
+        api.deleteNight.mockResolvedValue({
+            ok: true,
+            bookingDeleted: false,
+            nightsLeft: 2,
+        });
 
+        const { container } = render(<RemoveBooking />);
+
+        await waitFor(() =>
+            expect(container.querySelectorAll('select option').length).toBeGreaterThan(1)
+        );
         fireEvent.change(container.querySelector('select'), {
             target: { value: '1001' },
         });
@@ -291,18 +415,15 @@ describe('các màn hình quản lý', () => {
         fireEvent.click(screen.getByText('Tìm booking'));
 
         expect(await screen.findByText('TÌM THẤY BOOKING')).toBeInTheDocument();
-        fireEvent.click(screen.getByText('Xoá booking này'));
 
+        // Kỳ 3 đêm -> phải có cả lựa chọn xoá cả kỳ
+        expect(screen.getByText('Xoá cả 3 đêm')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByText('Xoá đêm này'));
         fireEvent.click(await screen.findByText('Xoá', { selector: '.ad-btn' }));
 
-        await waitFor(() =>
-            expect(
-                window.gapi.client.sheets.spreadsheets.values.update
-            ).toHaveBeenCalled()
-        );
-        const [[args]] =
-            window.gapi.client.sheets.spreadsheets.values.update.mock.calls;
-        expect(args.resource.values).toEqual([['']]);
-        expect(args.range).toMatch(/^Sheet1![A-Z]+2$/); // 1001 nằm ở hàng 2
+        await waitFor(() => expect(api.deleteNight).toHaveBeenCalled());
+        expect(api.deleteNight).toHaveBeenCalledWith('1001', expect.anything());
+        expect(api.deleteBooking).not.toHaveBeenCalled();
     });
 });

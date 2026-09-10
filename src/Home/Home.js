@@ -5,17 +5,7 @@ import dayjs from 'dayjs';
 import { useAuth } from '../App';
 import AdminShell, { displayName } from '../admin/AdminShell';
 import { Btn, Loading } from '../admin/ui';
-import {
-    cellLabel,
-    compactVnd,
-    findDateColumn,
-    findRoomRow,
-    parseCell,
-    readSheet,
-    STATUS_LABEL,
-} from '../admin/sheets';
-import { readMonth } from '../admin/revenue';
-import { ROOM_OPTIONS } from '../constants/roomOptions';
+import { compactVnd, getDashboard, shortRoomName } from '../admin/api';
 
 const WEEKDAYS = [
     'CHỦ NHẬT',
@@ -29,7 +19,7 @@ const WEEKDAYS = [
 
 const Home = memo(() => {
     const navigate = useNavigate();
-    const { isSignedIn, user, makeApiCall } = useAuth();
+    const { isSignedIn, user } = useAuth();
 
     const [loading, setLoading] = useState(true);
     const [today, setToday] = useState([]);
@@ -38,33 +28,11 @@ const Home = memo(() => {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const { data, headers } = await readSheet(makeApiCall);
-            const now = dayjs();
-
-            const { index: dateIndex } = findDateColumn(headers, now);
-            const rows = ROOM_OPTIONS.map((room) => {
-                const rowIndex = findRoomRow(data, room.value);
-                if (rowIndex === -1 || dateIndex === -1) {
-                    return { room, kind: 'unknown', status: STATUS_LABEL.unknown };
-                }
-                const value = data?.[rowIndex]?.[dateIndex] || '';
-                const parsed = parseCell(value);
-                return {
-                    room,
-                    kind: parsed.kind,
-                    status:
-                        parsed.kind === 'free'
-                            ? STATUS_LABEL.free
-                            : `${parsed.customerName || cellLabel(value)} · ${
-                                  parsed.kind === 'booked'
-                                      ? 'đã cọc'
-                                      : 'chờ cọc'
-                              }`,
-                };
-            });
-
-            setToday(rows);
-            setSummary(readMonth(data, headers, now));
+            // Ngày do CLIENT xác định. Server chạy ở UTC nên nếu để nó tự tính
+            // "hôm nay" thì từ 00:00 đến 07:00 giờ Việt Nam sẽ ra ngày hôm trước.
+            const data = await getDashboard(dayjs());
+            setToday(data.today);
+            setSummary(data.summary);
         } catch (error) {
             console.error('Error loading dashboard:', error);
             message.error(
@@ -73,7 +41,7 @@ const Home = memo(() => {
         } finally {
             setLoading(false);
         }
-    }, [makeApiCall]);
+    }, []);
 
     useEffect(() => {
         if (isSignedIn) load();
@@ -83,13 +51,21 @@ const Home = memo(() => {
     const freeToday = today.filter((row) => row.kind === 'free').length;
     const name = displayName(user);
 
+    // Mô tả ngắn cho từng dòng phòng.
+    const statusText = (row) => {
+        if (row.kind === 'free') return 'Trống';
+        if (row.kind === 'unknown') return 'Đã ngừng khai thác';
+        const who = row.booking?.guestName || 'Có khách';
+        return `${who} · ${row.kind === 'booked' ? 'đã cọc' : 'chờ cọc'}`;
+    };
+
     const headerExtra = (
         <div className="ad-stats" style={{ marginTop: 18 }}>
             <div className="ad-stat">
                 <div className="ad-stat__k">Trống hôm nay</div>
                 <div className="ad-stat__v ad-num">
                     {freeToday}
-                    <small>/{today.length || ROOM_OPTIONS.length}</small>
+                    <small>/{today.length || 6}</small>
                 </div>
             </div>
             <div className="ad-stat ad-stat--wait">
@@ -124,7 +100,7 @@ const Home = memo(() => {
                     <div className="ad-stat__k">Trống hôm nay</div>
                     <div className="ad-stat__v ad-num">
                         {freeToday}
-                        <small>/{today.length || ROOM_OPTIONS.length}</small>
+                        <small>/{today.length || 6}</small>
                     </div>
                 </div>
                 <div className="ad-stat ad-stat--book">
@@ -171,22 +147,24 @@ const Home = memo(() => {
                 <Loading />
             ) : (
                 <div className="ad-list" data-reveal>
-                    {today.map(({ room, kind, status }) => (
+                    {today.map((row) => (
                         <button
-                            key={room.value}
+                            key={row.room.value}
                             type="button"
-                            className={`ad-row is-${kind}`}
+                            className={`ad-row is-${row.kind}`}
                             onClick={() => navigate('/month-checking')}
                         >
                             <span className="ad-row__bar" />
                             <span className="ad-row__main">
                                 <span className="ad-row__name">
-                                    {room.label.split(' - ')[1] || room.label}
+                                    {shortRoomName(row.room.label)}
                                 </span>
-                                <span className="ad-row__meta">{status}</span>
+                                <span className="ad-row__meta">
+                                    {statusText(row)}
+                                </span>
                             </span>
                             <span className="ad-row__side ad-num">
-                                {room.value}
+                                {row.room.value}
                             </span>
                         </button>
                     ))}

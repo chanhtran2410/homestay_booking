@@ -1,18 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { message } from 'antd';
-import { useAuth } from '../App';
 import AdminShell from '../admin/AdminShell';
 import { Btn, DateField, useBusy } from '../admin/ui';
-import {
-    availableDates,
-    cellAt,
-    findDateColumn,
-    findRoomRow,
-    readSheet,
-    classify,
-} from '../admin/sheets';
-import { ROOM_OPTIONS } from '../constants/roomOptions';
-import { getRoomById } from '../constants/roomData';
+import { getAvailability, toApiDate, shortRoomName } from '../admin/api';
 
 const GROUPS = [
     { kind: 'free', label: 'Phòng trống', icon: '✓' },
@@ -21,14 +11,10 @@ const GROUPS = [
     { kind: 'unknown', label: 'Không rõ', icon: '?' },
 ];
 
-const roomMeta = (room) => {
-    const detail = getRoomById(room.value);
-    if (!detail) return room.type === 'bungalow' ? 'Bungalow' : 'Phòng';
-    return `${detail.capacity} khách · ${detail.size}`;
-};
+// Tên biến màu trong admin.css không trùng khít với tên bucket.
+const FG = { free: 'free', wait: 'wait', booked: 'book', unknown: 'unk' };
 
 const DateRoomChecker = () => {
-    const { makeApiCall } = useAuth();
     const [date, setDate] = useState(null);
     const [rows, setRows] = useState([]);
     const [scannedDate, setScannedDate] = useState('');
@@ -43,50 +29,16 @@ const DateRoomChecker = () => {
         await run(async () => {
             setRows([]);
             try {
-                const { data, headers } = await readSheet(makeApiCall);
-                const { index: dateIndex, format } = findDateColumn(
-                    headers,
-                    date
-                );
+                const data = await getAvailability(date);
+                setRows(data.rooms);
+                setScannedDate(toApiDate(date));
 
-                if (dateIndex === -1) {
-                    message.error(
-                        `Không tìm thấy ngày trong bảng tính. Các cột đang có: ${availableDates(
-                            headers
-                        )
-                            .slice(0, 12)
-                            .join(', ')}`
-                    );
-                    return;
-                }
-
-                const scanned = ROOM_OPTIONS.map((room) => {
-                    const roomRowIndex = findRoomRow(data, room.value);
-                    if (roomRowIndex === -1) {
-                        return {
-                            room,
-                            kind: 'unknown',
-                            detail: `Không có mã ${room.value} trong bảng tính`,
-                        };
-                    }
-                    const value = cellAt(data, roomRowIndex, dateIndex);
-                    const kind = classify(value);
-                    return {
-                        room,
-                        kind,
-                        detail: kind === 'free' ? roomMeta(room) : value,
-                    };
-                });
-
-                setRows(scanned);
-                setScannedDate(format || date.format('DD/MM/YYYY'));
-
-                const free = scanned.filter((r) => r.kind === 'free').length;
-                const busyCount = scanned.filter(
+                const free = data.rooms.filter((r) => r.kind === 'free').length;
+                const taken = data.rooms.filter(
                     (r) => r.kind === 'booked' || r.kind === 'wait'
                 ).length;
                 message.success(
-                    `Đã quét ${scanned.length} phòng: ${free} trống, ${busyCount} đã đặt`
+                    `Đã quét ${data.rooms.length} phòng: ${free} trống, ${taken} đã đặt`
                 );
             } catch (error) {
                 console.error('Error checking rooms:', error);
@@ -95,37 +47,40 @@ const DateRoomChecker = () => {
                 );
             }
         });
-    }, [date, makeApiCall, run]);
-
-    const headerExtra = (
-        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-                <DateField value={date} onChange={setDate} />
-            </div>
-            <Btn
-                variant="accent"
-                size="sm"
-                loading={busy}
-                onClick={onScan}
-                style={{ borderRadius: 12 }}
-            >
-                {busy ? 'Đang quét…' : 'Quét'}
-            </Btn>
-        </div>
-    );
+    }, [date, run]);
 
     return (
         <AdminShell
             back
             eyebrow="QUÉT CẢ 6 PHÒNG"
             title="Phòng trống theo ngày"
-            headerExtra={headerExtra}
+            headerExtra={
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <DateField value={date} onChange={setDate} />
+                    </div>
+                    <Btn
+                        variant="accent"
+                        size="sm"
+                        loading={busy}
+                        onClick={onScan}
+                        style={{ borderRadius: 12 }}
+                    >
+                        {busy ? 'Đang quét…' : 'Quét'}
+                    </Btn>
+                </div>
+            }
             actions={
                 <>
                     <div style={{ minWidth: 200 }}>
                         <DateField value={date} onChange={setDate} />
                     </div>
-                    <Btn variant="accent" size="sm" loading={busy} onClick={onScan}>
+                    <Btn
+                        variant="accent"
+                        size="sm"
+                        loading={busy}
+                        onClick={onScan}
+                    >
                         {busy ? 'Đang quét…' : 'Quét'}
                     </Btn>
                 </>
@@ -145,16 +100,10 @@ const DateRoomChecker = () => {
                         if (!group.length) return null;
                         return (
                             <div key={kind}>
-                                <div className={`ad-group`}>
+                                <div className="ad-group">
                                     <span
                                         style={{
-                                            color: `var(--ad-${
-                                                kind === 'booked'
-                                                    ? 'book'
-                                                    : kind === 'unknown'
-                                                    ? 'unk'
-                                                    : kind
-                                            }-fg)`,
+                                            color: `var(--ad-${FG[kind]}-fg)`,
                                         }}
                                     >
                                         {label}
@@ -173,9 +122,7 @@ const DateRoomChecker = () => {
                                             </span>
                                             <span className="ad-row__main">
                                                 <span className="ad-row__name">
-                                                    {room.label.split(
-                                                        ' - '
-                                                    )[1] || room.label}
+                                                    {shortRoomName(room.label)}
                                                 </span>
                                                 <span className="ad-row__meta">
                                                     {detail}

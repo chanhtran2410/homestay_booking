@@ -1,10 +1,10 @@
 import React, {
     createContext,
+    useCallback,
     useContext,
-    useState,
     useEffect,
     useMemo,
-    useCallback,
+    useState,
 } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ConfigProvider, message } from 'antd';
@@ -19,19 +19,9 @@ import RoomGallery from './components/RoomGallery';
 import Home from './Home/Home';
 import LoginScreen, { AdminSplash } from './admin/LoginScreen';
 import { ADMIN_THEME } from './admin/theme';
+import { supabase, isConfigured } from './lib/supabaseClient';
+import { getMe, setUnauthorizedHandler } from './admin/api';
 
-const CLIENT_ID =
-    process.env.REACT_APP_GOOGLE_CLIENT_ID ||
-    '311093634768-ps25fkb4hmm3d6bq86rdhh8cdi9hbd5o.apps.googleusercontent.com';
-const API_KEY =
-    process.env.REACT_APP_GOOGLE_API_KEY ||
-    'AIzaSyDO1vCsfDoJRAPt4pQ6BnRjtxjf_fnG7zQ';
-const DISCOVERY_DOCS = [
-    'https://sheets.googleapis.com/$discovery/rest?version=v4',
-];
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
-
-// Create Authentication Context
 const AuthContext = createContext();
 
 export const useAuth = () => {
@@ -42,296 +32,136 @@ export const useAuth = () => {
     return context;
 };
 
-// Helper functions for localStorage (outside component to avoid dependency issues)
-const saveAuthToStorage = (token, userInfo) => {
-    try {
-        localStorage.setItem('homestay_access_token', token);
-        localStorage.setItem('homestay_user', JSON.stringify(userInfo));
-        localStorage.setItem('homestay_login_time', Date.now().toString());
-    } catch (error) {
-        console.error('Failed to save auth to localStorage:', error);
-    }
-};
-
-const getAuthFromStorage = () => {
-    try {
-        const token = localStorage.getItem('homestay_access_token');
-        const userStr = localStorage.getItem('homestay_user');
-        const loginTime = localStorage.getItem('homestay_login_time');
-
-        if (!token || !userStr || !loginTime) {
-            return null;
-        }
-
-        // Check if token is older than 1 hour (3600000 ms)
-        const tokenAge = Date.now() - parseInt(loginTime);
-        const MAX_TOKEN_AGE = 60 * 60 * 1000; // 1 hour
-
-        if (tokenAge > MAX_TOKEN_AGE) {
-            clearAuthFromStorage();
-            return null;
-        }
-
-        return {
-            token,
-            user: JSON.parse(userStr),
-            loginTime: parseInt(loginTime),
-        };
-    } catch (error) {
-        console.error('Failed to get auth from localStorage:', error);
-        clearAuthFromStorage();
-        return null;
-    }
-};
-
-const clearAuthFromStorage = () => {
-    try {
-        localStorage.removeItem('homestay_access_token');
-        localStorage.removeItem('homestay_user');
-        localStorage.removeItem('homestay_login_time');
-    } catch (error) {
-        console.error('Failed to clear auth from localStorage:', error);
-    }
-};
-
-// Authentication Provider Component
+/**
+ * Quản lý phiên đăng nhập bằng Supabase Auth.
+ *
+ * So với bản cũ (Google OAuth trực tiếp từ trình duyệt để ghi Google Sheets):
+ *   - Không còn gapi/GIS, không còn access token của Google trong localStorage.
+ *   - supabase-js tự lưu phiên và tự gia hạn, nên bỏ hẳn đoạn tự đếm hạn 1 giờ
+ *     viết tay — nó luôn bị lệch và đá người dùng ra giữa chừng.
+ *   - Đăng nhập được KHÔNG đồng nghĩa với có quyền: /api/me kiểm tra tiếp
+ *     bảng admin_users. Đây là chỗ vá lỗ hổng "ai cũng thành admin".
+ */
 const AuthProvider = ({ children }) => {
-    const [isSignedIn, setIsSignedIn] = useState(false);
-    const [user, setUser] = useState(null);
-    const [accessToken, setAccessToken] = useState(null);
+    const [session, setSession] = useState(null);
+    const [admin, setAdmin] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [loginTime, setLoginTime] = useState(null);
-    const [apiInitialized, setApiInitialized] = useState(false);
+    const [deniedReason, setDeniedReason] = useState(null);
 
-    // Initialize Google Services
-    useEffect(() => {
-        const initializeGoogleServices = async () => {
-            try {
-                // Check for stored authentication first
-                const storedAuth = getAuthFromStorage();
-
-                // Wait for both gapi and google to be available
-                await new Promise((resolve) => {
-                    const checkLibraries = () => {
-                        if (window.gapi && window.google) {
-                            resolve();
-                        } else {
-                            setTimeout(checkLibraries, 100);
-                        }
-                    };
-                    checkLibraries();
-                });
-
-                // Initialize GAPI client
-                await new Promise((resolve, reject) => {
-                    window.gapi.load('client', async () => {
-                        try {
-                            await window.gapi.client.init({
-                                apiKey: API_KEY,
-                                discoveryDocs: DISCOVERY_DOCS,
-                            });
-                            setApiInitialized(true);
-                            resolve();
-                        } catch (error) {
-                            reject(error);
-                        }
-                    });
-                });
-
-                // Restore authentication if available
-                if (storedAuth) {
-                    // Set the access token for gapi requests
-                    window.gapi.client.setToken({
-                        access_token: storedAuth.token,
-                    });
-
-                    setAccessToken(storedAuth.token);
-                    setUser(storedAuth.user);
-                    setLoginTime(storedAuth.loginTime);
-                    setIsSignedIn(true);
-                    console.log('Authentication restored from localStorage');
-                } else {
-                    // Check if user is already signed in via gapi
-                    const token = window.gapi.client.getToken();
-                    if (token) {
-                        setIsSignedIn(true);
-                        setAccessToken(token.access_token);
-                        setLoginTime(Date.now());
-                    }
-                }
-
-                console.log('Google services initialized successfully');
-            } catch (error) {
-                console.error('Failed to initialize Google services:', error);
-                message.error('Failed to initialize Google services');
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        initializeGoogleServices();
-    }, []);
-
-    const handleLogin = useCallback(async () => {
+    // Xác minh quyền quản trị với máy chủ.
+    const verify = useCallback(async () => {
         try {
-            const tokenClient = window.google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: (response) => {
-                    if (response.error) {
-                        console.error('OAuth error:', response.error);
-                        message.error(`Login failed: ${response.error}`);
-                        return;
-                    }
-
-                    console.log(
-                        'Access token received:',
-                        response.access_token
-                    );
-
-                    const userInfo = { email: 'user@gmail.com' }; // You can enhance this to get actual user info
-
-                    // Save to localStorage
-                    saveAuthToStorage(response.access_token, userInfo);
-
-                    // Update state
-                    setAccessToken(response.access_token);
-                    setUser(userInfo);
-                    setLoginTime(Date.now());
-                    setIsSignedIn(true);
-                    message.success('Đăng nhập thành công!');
-
-                    // Set the access token for gapi requests
-                    window.gapi.client.setToken({
-                        access_token: response.access_token,
-                    });
-                },
-            });
-
-            tokenClient.requestAccessToken();
+            const me = await getMe();
+            setAdmin(me);
+            setDeniedReason(null);
         } catch (error) {
-            console.error('Login failed:', error);
-            message.error('Đăng nhập thất bại. Vui lòng thử lại.');
-        }
-    }, []);
-
-    const handleLogout = useCallback(() => {
-        if (accessToken) {
-            window.google.accounts.oauth2.revoke(accessToken);
-        }
-        window.gapi.client.setToken(null);
-
-        // Clear localStorage
-        clearAuthFromStorage();
-
-        // Clear state
-        setAccessToken(null);
-        setIsSignedIn(false);
-        setUser(null);
-        setLoginTime(null);
-        message.success('Đăng xuất thành công');
-    }, [accessToken]);
-
-    // Function to handle token expiration and force re-login
-    const handleTokenExpiration = useCallback(() => {
-        console.warn('Token expired or invalid, forcing re-login');
-
-        // Clear stored authentication
-        clearAuthFromStorage();
-        window.gapi.client.setToken(null);
-
-        // Clear state
-        setAccessToken(null);
-        setIsSignedIn(false);
-        setUser(null);
-        setLoginTime(null);
-
-        message.warning('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-    }, []);
-
-    // Centralized API call wrapper with token expiration handling
-    const makeApiCall = useCallback(
-        async (apiCallFunction) => {
-            if (!apiInitialized || !isSignedIn || !accessToken) {
-                throw new Error('Not authenticated or API not initialized');
+            setAdmin(null);
+            if (error.status === 403) {
+                setDeniedReason(error.message);
+            } else if (error.status !== 401) {
+                message.error(error.message || 'Không xác minh được tài khoản.');
             }
+        }
+    }, []);
 
-            try {
-                return await apiCallFunction();
-            } catch (error) {
-                console.error('API call error:', error);
+    useEffect(() => {
+        if (!isConfigured) {
+            setIsLoading(false);
+            return undefined;
+        }
 
-                // Check for various token expiration indicators
-                const isTokenExpired =
-                    error.status === 401 ||
-                    error.status === 403 ||
-                    (error.result &&
-                        error.result.error &&
-                        (error.result.error.code === 401 ||
-                            error.result.error.code === 403 ||
-                            error.result.error.message?.includes(
-                                'Invalid Credentials'
-                            ) ||
-                            error.result.error.message?.includes(
-                                'Request had invalid credentials'
-                            ) ||
-                            error.result.error.message?.includes(
-                                'invalid_token'
-                            ) ||
-                            error.result.error.message?.includes(
-                                'token_expired'
-                            ))) ||
-                    (error.message &&
-                        (error.message.includes('Invalid Credentials') ||
-                            error.message.includes(
-                                'Request had invalid credentials'
-                            ) ||
-                            error.message.includes('invalid_token') ||
-                            error.message.includes('token_expired'))) ||
-                    (typeof error === 'string' &&
-                        (error.includes('Invalid Credentials') ||
-                            error.includes('Request had invalid credentials') ||
-                            error.includes('invalid_token') ||
-                            error.includes('token_expired')));
+        let alive = true;
 
-                if (isTokenExpired) {
-                    handleTokenExpiration();
-                    throw new Error(
-                        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
-                    );
+        supabase.auth.getSession().then(async ({ data }) => {
+            if (!alive) return;
+            setSession(data.session);
+            if (data.session) await verify();
+            if (alive) setIsLoading(false);
+        });
+
+        const { data: sub } = supabase.auth.onAuthStateChange(
+            async (event, next) => {
+                if (!alive) return;
+                setSession(next);
+                if (next) {
+                    await verify();
+                } else {
+                    setAdmin(null);
+                    setDeniedReason(null);
                 }
-
-                // Re-throw the original error if it's not related to token expiration
-                throw error;
             }
-        },
-        [apiInitialized, isSignedIn, accessToken, handleTokenExpiration]
-    );
+        );
+
+        return () => {
+            alive = false;
+            sub?.subscription?.unsubscribe();
+        };
+    }, [verify]);
+
+    const handleLogout = useCallback(async () => {
+        await supabase?.auth.signOut();
+        setAdmin(null);
+        setDeniedReason(null);
+        message.success('Đã đăng xuất');
+    }, []);
+
+    // Token hết hạn giữa chừng -> đăng xuất, quay về màn hình đăng nhập.
+    useEffect(() => {
+        setUnauthorizedHandler(() => {
+            supabase?.auth.signOut();
+            setAdmin(null);
+        });
+        return () => setUnauthorizedHandler(null);
+    }, []);
+
+    const loginWithGoogle = useCallback(async () => {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: `${window.location.origin}/` },
+        });
+        if (error) message.error(error.message);
+    }, []);
+
+    const loginWithPassword = useCallback(async (email, password) => {
+        const { error } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+        });
+        if (error) {
+            message.error(
+                error.message === 'Invalid login credentials'
+                    ? 'Email hoặc mật khẩu không đúng.'
+                    : error.message
+            );
+            return false;
+        }
+        return true;
+    }, []);
+
+    const isSignedIn = Boolean(session && admin);
 
     const value = useMemo(
         () => ({
             isSignedIn,
-            user,
-            accessToken,
-            apiInitialized,
-            handleLogin,
-            handleLogout,
+            user: admin,
+            session,
             isLoading,
-            loginTime,
-            makeApiCall,
-            handleTokenExpiration,
+            loginTime: session?.expires_at
+                ? session.expires_at * 1000 - 60 * 60 * 1000
+                : null,
+            expiresAt: session?.expires_at ? session.expires_at * 1000 : null,
+            handleLogout,
+            loginWithGoogle,
+            loginWithPassword,
         }),
         [
             isSignedIn,
-            user,
-            accessToken,
-            apiInitialized,
-            handleLogin,
-            handleLogout,
+            admin,
+            session,
             isLoading,
-            loginTime,
-            makeApiCall,
-            handleTokenExpiration,
+            handleLogout,
+            loginWithGoogle,
+            loginWithPassword,
         ]
     );
 
@@ -342,7 +172,13 @@ const AuthProvider = ({ children }) => {
             ) : isSignedIn ? (
                 children
             ) : (
-                <LoginScreen onLogin={handleLogin} />
+                <LoginScreen
+                    onGoogle={loginWithGoogle}
+                    onPassword={loginWithPassword}
+                    onSignOut={handleLogout}
+                    deniedReason={deniedReason}
+                    configured={isConfigured}
+                />
             )}
         </AuthContext.Provider>
     );
@@ -353,10 +189,10 @@ const App = () => {
         <ConfigProvider theme={ADMIN_THEME}>
             <Router>
                 <Routes>
-                    {/* Public routes - no authentication required */}
+                    {/* Công khai — không cần đăng nhập */}
                     <Route path="/rooms" element={<RoomGallery />} />
 
-                    {/* Protected routes - authentication required */}
+                    {/* Cần quyền quản trị */}
                     <Route
                         path="/*"
                         element={

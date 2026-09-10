@@ -6,7 +6,8 @@ import React, {
     useState,
 } from 'react';
 import useScrollReveal from '../hooks/useScrollReveal';
-import { ROOM_DATA, formatPrice, CONTACT_INFO } from '../constants/roomData';
+import { getPublicRooms } from '../admin/api';
+import { CONTACT_INFO, formatPrice } from '../constants/contact';
 import {
     DAY_PLAN,
     DEFAULT_ROOM_THEME,
@@ -147,6 +148,7 @@ const RoomGallery = () => {
     const scrollY = useScrollY();
     const viewportH = useViewportHeight();
 
+    const [roomData, setRoomData] = useState([]);
     const [category, setCategory] = useState('all');
     const [active, setActive] = useState(0);
     const [detailId, setDetailId] = useState(null);
@@ -164,19 +166,30 @@ const RoomGallery = () => {
         return () => document.body.classList.remove('bl-landing');
     }, []);
 
+    // Dữ liệu phòng lấy từ /api/rooms?scope=public — không cần đăng nhập,
+    // và được CDN của Vercel cache 5 phút.
+    useEffect(() => {
+        getPublicRooms()
+            .then(setRoomData)
+            .catch((error) => {
+                console.error('Không tải được danh sách phòng:', error);
+                setRoomData([]);
+            });
+    }, []);
+
     const storyP = useRevealProgress(storyRef, scrollY);
     const mapP = useRevealProgress(mapRef, scrollY);
 
     const rooms = useMemo(
         () =>
-            ROOM_DATA.map((room) => ({
+            roomData.map((room) => ({
                 ...room,
                 theme: ROOM_THEME[room.id] || DEFAULT_ROOM_THEME,
                 tag: room.type === 'bungalow' ? 'BUNGALOW' : 'PHÒNG',
                 short: `${room.capacity} khách · ${room.size}`,
                 cover: room.images?.[0] || room.thumbnail,
             })),
-        []
+        [roomData]
     );
 
     const list = useMemo(
@@ -188,16 +201,19 @@ const RoomGallery = () => {
     );
 
     const stats = useMemo(() => {
-        const caps = ROOM_DATA.map((room) => room.capacity);
+        if (roomData.length === 0) {
+            return { count: '—', capacity: '—', from: '—' };
+        }
+        const caps = roomData.map((room) => room.capacity);
         const minPrice = Math.min(
-            ...ROOM_DATA.map((room) => room.pricing.weekday)
+            ...roomData.map((room) => room.pricing.weekday)
         );
         return {
-            count: ROOM_DATA.length,
+            count: roomData.length,
             capacity: `${Math.min(...caps)}–${Math.max(...caps)}`,
             from: shortPrice(minPrice),
         };
-    }, []);
+    }, [roomData]);
 
     const phone = formatPhone(CONTACT_INFO.phone);
     const activeIndex = Math.min(active, Math.max(0, list.length - 1));

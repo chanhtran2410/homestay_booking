@@ -1,8 +1,5 @@
-import React, { memo, useCallback, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { message } from 'antd';
-import dayjs from 'dayjs';
-import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import { useAuth } from '../App';
 import AdminShell from '../admin/AdminShell';
 import {
     Btn,
@@ -15,187 +12,147 @@ import {
     useBusy,
 } from '../admin/ui';
 import {
-    findRoomRow,
-    readSheet,
-    SHEET_NAME,
-    SPREADSHEET_ID,
-} from '../admin/sheets';
-import { ROOM_OPTIONS } from '../constants/roomOptions';
+    createBooking,
+    getRooms,
+    parseAmount,
+    formatVnd,
+    toApiDate,
+    shortRoomName,
+} from '../admin/api';
 
-dayjs.extend(isSameOrBefore);
-
-// Giá trị ghi xuống Sheet — các màn hình khác dựa vào đúng chuỗi này để phân loại.
-const STATUS_DEPOSIT = 'Đã đặt cọc';
-const STATUS_PENDING = 'Đang đợi đặt cọc';
+// Giá trị khớp enum booking_status trong CSDL.
+const STATUS_DEPOSIT = 'booked';
+const STATUS_PENDING = 'wait';
 
 const emptyForm = {
     roomIds: [],
     fromDate: null,
     nights: 1,
     name: '',
+    phone: '',
+    note: '',
     status: STATUS_DEPOSIT,
     price: '',
 };
 
 const Booking = memo(() => {
-    const { makeApiCall } = useAuth();
+    const [rooms, setRooms] = useState([]);
     const [form, setForm] = useState(emptyForm);
     const [busy, run] = useBusy();
+    // { conflicts: [...], token: '...' } khi máy chủ báo có ô đã kín
     const [conflict, setConflict] = useState(null);
+
+    useEffect(() => {
+        getRooms()
+            .then((data) => setRooms(data.options))
+            .catch(() => setRooms([]));
+    }, []);
 
     const set = (patch) => setForm((prev) => ({ ...prev, ...patch }));
 
     const dateRange = useMemo(() => {
         if (!form.fromDate) return [];
         return Array.from({ length: form.nights }, (_, i) =>
-            form.fromDate.add(i, 'day').format('DD/MM/YYYY')
+            form.fromDate.add(i, 'day').format('DD/MM')
         );
     }, [form.fromDate, form.nights]);
 
-    const composedValue = `${form.name || 'Tên khách'} - ${form.status}${
-        form.status === STATUS_DEPOSIT && form.price ? ` - ${form.price}` : ''
-    }`;
+    const deposit = parseAmount(form.price);
 
-    // Ghi các ô đã xác định xuống Sheet.
-    const writeCells = useCallback(
-        async (cells, value) =>
-            run(async () => {
-                await makeApiCall(() =>
-                    window.gapi.client.sheets.spreadsheets.batchUpdate({
-                        spreadsheetId: SPREADSHEET_ID,
-                        resource: {
-                            requests: cells.map((cell) => ({
-                                updateCells: {
-                                    range: {
-                                        sheetId: 0,
-                                        startRowIndex: cell.roomRowIndex,
-                                        endRowIndex: cell.roomRowIndex + 1,
-                                        startColumnIndex: cell.dateIndex,
-                                        endColumnIndex: cell.dateIndex + 1,
-                                    },
-                                    rows: [
-                                        {
-                                            values: [
-                                                {
-                                                    userEnteredValue: {
-                                                        stringValue: value,
-                                                    },
-                                                },
-                                            ],
-                                        },
-                                    ],
-                                    fields: 'userEnteredValue',
-                                },
-                            })),
-                        },
-                    })
-                );
+    /**
+     * Gửi yêu cầu tạo booking.
+     *
+     * Máy chủ dùng giao thức hai pha (xem hàm create_booking trong
+     * supabase/migrations/0002_functions.sql):
+     *   lần 1  -> nếu có đêm đã kín, trả về danh sách xung đột kèm token,
+     *            KHÔNG ghi gì.
+     *   lần 2  -> gửi lại kèm token. Nếu trong lúc người dùng đang xem hộp
+     *            xác nhận mà dữ liệu đổi, token lệch và máy chủ từ chối —
+     *            tránh xoá nhầm booking mà người dùng chưa hề thấy.
+     */
+    const submit = useCallback(
+        async (overwrite = false, conflictToken = null, retried = false) => {
+            if (!form.roomIds.length) {
+                message.error('Vui lòng chọn ít nhất một phòng');
+                return;
+            }
+            if (!form.fromDate) {
+                message.error('Vui lòng chọn ngày nhận phòng');
+                return;
+            }
+            if (!form.name.trim()) {
+                message.error('Vui lòng nhập tên khách hàng');
+                return;
+            }
+            if (form.status === STATUS_DEPOSIT && deposit <= 0) {
+                message.error('Vui lòng nhập tiền đặt cọc');
+                return;
+            }
 
-                message.success(
-                    `Đã ghi ${cells.length} ô vào ${SHEET_NAME} (${form.nights} đêm × ${form.roomIds.length} phòng)`
-                );
-                setForm(emptyForm);
-                setConflict(null);
-            }),
-        [makeApiCall, run, form.nights, form.roomIds.length]
+            await run(async () => {
+                try {
+                    const result = await createBooking({
+                        roomIds: form.roomIds,
+                        checkIn: toApiDate(form.fromDate),
+                        nights: form.nights,
+                        guestName: form.name.trim(),
+                        guestPhone: form.phone.trim() || null,
+                        note: form.note.trim() || null,
+                        status: form.status,
+                        deposit,
+                        overwrite,
+                        conflictToken,
+                    });
+
+                    if (
+                        result.code === 'conflict' ||
+                        result.code === 'conflict_changed'
+                    ) {
+                        setConflict({
+                            conflicts: result.conflicts,
+                            token: result.conflictToken,
+                        });
+                        if (result.code === 'conflict_changed') {
+                            message.warning(
+                                'Dữ liệu vừa thay đổi, vui lòng xem lại danh sách bên dưới.'
+                            );
+                        }
+                        return;
+                    }
+
+                    // Có người chen vào đúng lúc — thử lại một lần.
+                    if (result.code === 'conflict_race' && !retried) {
+                        return submit(overwrite, conflictToken, true);
+                    }
+
+                    if (result.ok !== true) {
+                        message.error('Không ghi được. Vui lòng thử lại.');
+                        return;
+                    }
+
+                    message.success(
+                        `Đã ghi ${result.nightsWritten} đêm cho ${form.roomIds.length} phòng`
+                    );
+                    setForm(emptyForm);
+                    setConflict(null);
+                } catch (error) {
+                    console.error('Booking failed:', error);
+                    message.error(
+                        error.message || 'Ghi dữ liệu thất bại. Thử lại sau.'
+                    );
+                }
+            });
+        },
+        [form, deposit, run]
     );
 
-    const onSubmit = useCallback(async () => {
-        if (!form.roomIds.length) {
-            message.error('Vui lòng chọn ít nhất một phòng');
-            return;
-        }
-        if (!form.fromDate) {
-            message.error('Vui lòng chọn ngày nhận phòng');
-            return;
-        }
-        if (!form.name.trim()) {
-            message.error('Vui lòng nhập tên khách hàng');
-            return;
-        }
-        if (form.status === STATUS_DEPOSIT && !form.price.trim()) {
-            message.error('Vui lòng nhập tiền đặt cọc');
-            return;
-        }
-
-        await run(async () => {
-            try {
-                const { data, headers } = await readSheet(makeApiCall);
-
-                const cells = [];
-                const invalidRooms = [];
-                const invalidDates = new Set();
-
-                for (const roomId of form.roomIds) {
-                    const roomRowIndex = findRoomRow(data, roomId);
-                    if (roomRowIndex === -1) {
-                        invalidRooms.push(roomId);
-                        continue;
-                    }
-                    for (const formattedDate of dateRange) {
-                        const dateIndex = headers.indexOf(formattedDate);
-                        if (dateIndex === -1) {
-                            invalidDates.add(formattedDate);
-                            continue;
-                        }
-                        cells.push({
-                            roomId,
-                            date: formattedDate,
-                            dateIndex,
-                            roomRowIndex,
-                            currentValue:
-                                data?.[roomRowIndex]?.[dateIndex] || '',
-                        });
-                    }
-                }
-
-                if (invalidRooms.length) {
-                    message.error(
-                        `Không tìm thấy phòng trong bảng tính: ${invalidRooms.join(
-                            ', '
-                        )}`
-                    );
-                }
-                if (invalidDates.size) {
-                    message.warning(
-                        `Các ngày không có trong bảng tính: ${[
-                            ...invalidDates,
-                        ].join(', ')}`
-                    );
-                }
-                if (!cells.length) {
-                    message.error('Không có dữ liệu hợp lệ nào để cập nhật');
-                    return;
-                }
-
-                const taken = cells.filter(
-                    (cell) => cell.currentValue.trim() !== ''
-                );
-                if (taken.length) {
-                    setConflict({ cells, taken });
-                    return;
-                }
-
-                await writeCells(cells, composedValue);
-            } catch (error) {
-                console.error('Sheet update failed:', error);
-                message.error(
-                    error.message || 'Ghi vào bảng tính thất bại. Thử lại sau.'
-                );
-            }
-        });
-    }, [form, dateRange, makeApiCall, run, writeCells, composedValue]);
-
     return (
-        <AdminShell
-            back
-            eyebrow={`GHI VÀO ${SHEET_NAME.toUpperCase()}`}
-            title="Đặt phòng"
-        >
+        <AdminShell back eyebrow="GHI VÀO CƠ SỞ DỮ LIỆU" title="Đặt phòng">
             <div className="ad-cols">
                 <div>
                     <Field label="Chọn phòng · nhiều phòng">
                         <RoomChips
+                            options={rooms}
                             value={form.roomIds}
                             onChange={(roomIds) => set({ roomIds })}
                         />
@@ -229,13 +186,28 @@ const Booking = memo(() => {
                         />
                     </Field>
 
+                    <Field label="Số điện thoại (không bắt buộc)">
+                        <input
+                            className="ad-input ad-num"
+                            type="tel"
+                            placeholder="0903 664 474"
+                            value={form.phone}
+                            onChange={(event) =>
+                                set({ phone: event.target.value })
+                            }
+                        />
+                    </Field>
+
                     <Field label="Trạng thái">
                         <Segmented
                             value={form.status}
                             onChange={(status) => set({ status })}
                             options={[
                                 { value: STATUS_DEPOSIT, label: 'Đã đặt cọc' },
-                                { value: STATUS_PENDING, label: 'Đang đợi cọc' },
+                                {
+                                    value: STATUS_PENDING,
+                                    label: 'Đang đợi cọc',
+                                },
                             ]}
                         />
                     </Field>
@@ -263,32 +235,50 @@ const Booking = memo(() => {
                             </div>
                         </Field>
                     )}
+
+                    <Field label="Ghi chú (không bắt buộc)">
+                        <input
+                            className="ad-input"
+                            placeholder="Ví dụ: đến muộn sau 20:00"
+                            value={form.note}
+                            onChange={(event) =>
+                                set({ note: event.target.value })
+                            }
+                        />
+                    </Field>
                 </div>
 
                 <div>
-                    <div className="ad-note" style={{ marginTop: 16 }} data-reveal>
+                    <div
+                        className="ad-note"
+                        style={{ marginTop: 16 }}
+                        data-reveal
+                    >
                         <div>
                             Sẽ ghi{' '}
-                            <b>{form.roomIds.length * form.nights} ô</b> ·{' '}
+                            <b>{form.roomIds.length * form.nights} đêm</b> ·{' '}
                             {form.roomIds.length} phòng × {form.nights} đêm
                         </div>
                         <div className="ad-num" style={{ marginTop: 6 }}>
                             {dateRange.length
-                                ? `${dateRange
-                                      .map((date) => date.slice(0, 5))
-                                      .join(' · ')} — “${composedValue}”`
+                                ? dateRange.join(' · ')
                                 : 'Chọn ngày nhận phòng để xem trước.'}
                         </div>
                         {form.roomIds.length > 0 && (
                             <div style={{ marginTop: 6 }}>
                                 {form.roomIds
-                                    .map(
-                                        (id) =>
-                                            ROOM_OPTIONS.find(
-                                                (room) => room.value === id
-                                            )?.label || id
+                                    .map((id) =>
+                                        shortRoomName(
+                                            rooms.find((r) => r.value === id)
+                                                ?.label
+                                        )
                                     )
                                     .join(' · ')}
+                            </div>
+                        )}
+                        {form.status === STATUS_DEPOSIT && deposit > 0 && (
+                            <div style={{ marginTop: 6 }}>
+                                Tiền cọc: {formatVnd(deposit)}
                             </div>
                         )}
                     </div>
@@ -305,9 +295,9 @@ const Booking = memo(() => {
                             variant="primary"
                             grow
                             loading={busy}
-                            onClick={onSubmit}
+                            onClick={() => submit(false, null)}
                         >
-                            {busy ? 'Đang ghi…' : `Ghi vào ${SHEET_NAME}`}
+                            {busy ? 'Đang ghi…' : 'Lưu đặt phòng'}
                         </Btn>
                     </div>
                 </div>
@@ -316,21 +306,26 @@ const Booking = memo(() => {
             {conflict && (
                 <ConfirmSheet
                     danger={false}
-                    title="Có dữ liệu đã tồn tại"
+                    title="Có đêm đã kín"
                     confirmLabel="Ghi đè tất cả"
                     busy={busy}
                     body={
                         <>
-                            {conflict.taken.length} ô đã có dữ liệu:{' '}
-                            {conflict.taken
-                                .map((cell) => `${cell.roomId} · ${cell.date}`)
+                            {conflict.conflicts.length} đêm đã có khách:{' '}
+                            {conflict.conflicts
+                                .map(
+                                    (item) =>
+                                        `${item.roomCode} · ${item.date} (${item.guestName})`
+                                )
                                 .join(', ')}
-                            .<br />
-                            Ghi đè sẽ thay nội dung cũ bằng “{composedValue}”.
+                            .
+                            <br />
+                            Ghi đè sẽ xoá những booking đó và thay bằng “
+                            {form.name.trim()}”.
                         </>
                     }
                     onCancel={() => setConflict(null)}
-                    onConfirm={() => writeCells(conflict.cells, composedValue)}
+                    onConfirm={() => submit(true, conflict.token)}
                 />
             )}
         </AdminShell>

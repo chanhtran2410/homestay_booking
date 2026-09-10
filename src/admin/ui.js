@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { DatePicker } from 'antd';
-import { ROOM_OPTIONS } from '../constants/roomOptions';
 
 /* --------------------------------------------------------------------------
    Khối form
@@ -48,14 +47,22 @@ export const Btn = ({
     </button>
 );
 
-export const RoomSelect = ({ value, onChange, placeholder = 'Chọn phòng' }) => (
+export const RoomSelect = ({
+    options = [],
+    value,
+    onChange,
+    placeholder = 'Chọn phòng',
+}) => (
     <select
         className="ad-input ad-select"
         value={value || ''}
         onChange={(event) => onChange(event.target.value || null)}
+        disabled={options.length === 0}
     >
-        <option value="">{placeholder}</option>
-        {ROOM_OPTIONS.map((room) => (
+        <option value="">
+            {options.length === 0 ? 'Đang tải danh sách phòng…' : placeholder}
+        </option>
+        {options.map((room) => (
             <option key={room.value} value={room.value}>
                 {room.label}
             </option>
@@ -116,7 +123,7 @@ export const Segmented = ({ value, onChange, options }) => (
    Chọn nhiều phòng — chip + bottom sheet
    -------------------------------------------------------------------------- */
 
-export const RoomChips = ({ value, onChange }) => {
+export const RoomChips = ({ options = [], value, onChange }) => {
     const [open, setOpen] = useState(false);
 
     const toggle = (roomId) =>
@@ -130,7 +137,7 @@ export const RoomChips = ({ value, onChange }) => {
         <>
             <div className={`ad-chips${value.length ? ' ad-chips--on' : ''}`}>
                 {value.map((roomId) => {
-                    const room = ROOM_OPTIONS.find((r) => r.value === roomId);
+                    const room = options.find((r) => r.value === roomId);
                     return (
                         <span key={roomId} className="ad-chip">
                             {room ? room.label.replace(' - ', ' ') : roomId}
@@ -157,7 +164,7 @@ export const RoomChips = ({ value, onChange }) => {
             {open && (
                 <BottomSheet onClose={() => setOpen(false)} title="Chọn phòng">
                     <div className="ad-list" style={{ marginTop: 14 }}>
-                        {ROOM_OPTIONS.map((room) => {
+                        {options.map((room) => {
                             const on = value.includes(room.value);
                             return (
                                 <button

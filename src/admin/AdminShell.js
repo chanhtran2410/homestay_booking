@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
-import { getLastSync, SHEET_NAME, SHEET_URL } from './sheets';
+import { getLastSync, DATA_SOURCE } from './api';
 import { BottomSheet, useBodyClass } from './ui';
 import useScrollReveal from '../hooks/useScrollReveal';
 import './admin.css';
@@ -41,10 +41,11 @@ const BrandMark = ({ circle = '#2B3A2C' }) => (
     </svg>
 );
 
-// Không có tên thật từ Google, chỉ suy ra từ phần trước @ của email.
+// admin_users.full_name nếu có, không thì suy ra từ phần trước @ của email.
 export const displayName = (user) => {
+    if (user?.fullName) return user.fullName;
     const local = user?.email?.split('@')[0];
-    if (!local || local === 'user') return 'bạn';
+    if (!local) return 'bạn';
     return local.charAt(0).toUpperCase() + local.slice(1);
 };
 
@@ -65,11 +66,11 @@ const SyncLine = () => {
             <div className="ad-src__k">NGUỒN DỮ LIỆU</div>
             <a
                 className="ad-src__v"
-                href={SHEET_URL}
+                href={DATA_SOURCE.url}
                 target="_blank"
                 rel="noopener noreferrer"
             >
-                Google Sheet · {SHEET_NAME}
+                {DATA_SOURCE.label}
             </a>
             <div className="ad-src__sync">
                 <i />
@@ -83,7 +84,7 @@ const SyncLine = () => {
     );
 };
 
-const SessionLine = ({ loginTime }) => {
+const SessionLine = ({ expiresAt }) => {
     const [, force] = useState(0);
 
     useEffect(() => {
@@ -91,12 +92,10 @@ const SessionLine = ({ loginTime }) => {
         return () => clearInterval(id);
     }, []);
 
-    if (!loginTime) return 'Đang hoạt động';
-    const left = Math.max(
-        0,
-        Math.round((loginTime + 60 * 60 * 1000 - Date.now()) / 60000)
-    );
-    return left > 0 ? `Hết hạn sau ${left} phút` : 'Phiên đã hết hạn';
+    // Supabase tự gia hạn token nền, nên đây chỉ là thông tin tham khảo.
+    if (!expiresAt) return 'Đang hoạt động';
+    const left = Math.max(0, Math.round((expiresAt - Date.now()) / 60000));
+    return left > 0 ? `Phiên còn ${left} phút` : 'Đang gia hạn…';
 };
 
 const AdminShell = ({
@@ -111,7 +110,7 @@ const AdminShell = ({
 }) => {
     const navigate = useNavigate();
     const { pathname } = useLocation();
-    const { user, handleLogout, loginTime } = useAuth();
+    const { user, handleLogout, expiresAt } = useAuth();
     const [moreOpen, setMoreOpen] = useState(false);
     const contentRef = useRef(null);
 
@@ -165,7 +164,7 @@ const AdminShell = ({
                         <span className="ad-user__meta">
                             <span className="ad-user__name">{name}</span>
                             <span className="ad-user__sub">
-                                <SessionLine loginTime={loginTime} />
+                                <SessionLine expiresAt={expiresAt} />
                             </span>
                         </span>
                         <button

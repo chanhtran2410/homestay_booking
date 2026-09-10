@@ -1,25 +1,21 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { message } from 'antd';
-import { useAuth } from '../App';
 import AdminShell from '../admin/AdminShell';
 import { Btn, DateField, Field, RoomSelect, useBusy } from '../admin/ui';
-import {
-    availableDates,
-    cellAt,
-    findDateColumn,
-    findRoomRow,
-    parseCell,
-    readSheet,
-} from '../admin/sheets';
-import { ROOM_OPTIONS } from '../constants/roomOptions';
+import { getAvailability, getRooms, formatVnd } from '../admin/api';
 
 const RoomAvailability = () => {
-    const { makeApiCall } = useAuth();
+    const [rooms, setRooms] = useState([]);
     const [roomId, setRoomId] = useState(null);
     const [date, setDate] = useState(null);
     const [result, setResult] = useState(null);
-    const [missingDate, setMissingDate] = useState(null);
     const [busy, run] = useBusy();
+
+    useEffect(() => {
+        getRooms()
+            .then((data) => setRooms(data.options))
+            .catch(() => setRooms([]));
+    }, []);
 
     const onCheck = useCallback(async () => {
         if (!roomId) {
@@ -33,55 +29,30 @@ const RoomAvailability = () => {
 
         await run(async () => {
             setResult(null);
-            setMissingDate(null);
             try {
-                const { data, headers } = await readSheet(makeApiCall);
-                const { index: dateIndex, format } = findDateColumn(
-                    headers,
-                    date
-                );
-
-                if (dateIndex === -1) {
-                    setMissingDate(availableDates(headers).slice(0, 12));
-                    message.error(
-                        `Không tìm thấy ngày "${date.format(
-                            'DD/MM/YYYY'
-                        )}" trong bảng tính`
-                    );
-                    return;
-                }
-
-                const roomRowIndex = findRoomRow(data, roomId);
-                if (roomRowIndex === -1) {
-                    message.error(
-                        `Không tìm thấy phòng "${roomId}" trong bảng tính`
-                    );
-                    return;
-                }
-
-                const value = cellAt(data, roomRowIndex, dateIndex);
-                setResult({
-                    ...parseCell(value),
-                    roomId,
-                    date: format || date.format('DD/MM/YYYY'),
-                });
+                const data = await getAvailability(date, roomId);
+                setResult({ ...data.rooms[0], date: data.date });
             } catch (error) {
-                console.error('Error reading sheet:', error);
+                console.error('Error checking room:', error);
                 message.error(
                     error.message || 'Lỗi khi kiểm tra phòng. Vui lòng thử lại.'
                 );
             }
         });
-    }, [roomId, date, makeApiCall, run]);
+    }, [roomId, date, run]);
 
-    const room = ROOM_OPTIONS.find((option) => option.value === roomId);
+    const booking = result?.booking;
 
     return (
         <AdminShell back eyebrow="TRA CỨU NHANH" title="Kiểm tra phòng">
             <div className="ad-cols">
                 <div>
                     <Field label="Phòng">
-                        <RoomSelect value={roomId} onChange={setRoomId} />
+                        <RoomSelect
+                            options={rooms}
+                            value={roomId}
+                            onChange={setRoomId}
+                        />
                     </Field>
 
                     <Field label="Ngày">
@@ -112,7 +83,7 @@ const RoomAvailability = () => {
                                         Phòng trống
                                     </div>
                                     <div className="ad-result__sub ad-num">
-                                        {result.roomId} · {result.date}
+                                        {result.room.value} · {result.date}
                                     </div>
                                 </div>
                             </div>
@@ -130,37 +101,75 @@ const RoomAvailability = () => {
                                     <div className="ad-result__title">
                                         {result.kind === 'booked'
                                             ? 'Đã có khách'
-                                            : 'Đang đợi cọc'}
+                                            : result.kind === 'wait'
+                                            ? 'Đang đợi cọc'
+                                            : 'Phòng đã ngừng khai thác'}
                                     </div>
                                     <div className="ad-result__sub ad-num">
-                                        {result.roomId} · {result.date}
+                                        {result.room.value} · {result.date}
                                     </div>
                                 </div>
                             </div>
-                            <div className="ad-result__cell">
-                                <div className="ad-card__k">NỘI DUNG Ô</div>
-                                <div>{result.raw}</div>
-                            </div>
+
+                            {booking && (
+                                <div className="ad-result__cell">
+                                    <div className="ad-card__k">
+                                        THÔNG TIN ĐẶT PHÒNG
+                                    </div>
+                                    <div className="ad-kv" style={{ marginTop: 10 }}>
+                                        <div>
+                                            <div className="ad-kv__k">Khách</div>
+                                            <div className="ad-kv__v">
+                                                {booking.guestName}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="ad-kv__k">
+                                                Tiền cọc
+                                            </div>
+                                            <div className="ad-kv__v ad-num">
+                                                {booking.deposit
+                                                    ? formatVnd(booking.deposit)
+                                                    : '—'}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="ad-kv__k">
+                                                Nhận phòng
+                                            </div>
+                                            <div className="ad-kv__v ad-num">
+                                                {booking.checkIn} ·{' '}
+                                                {booking.nights} đêm
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="ad-kv__k">
+                                                Điện thoại
+                                            </div>
+                                            <div className="ad-kv__v ad-num">
+                                                {booking.guestPhone || '—'}
+                                            </div>
+                                        </div>
+                                        {booking.note && (
+                                            <div className="ad-kv__wide">
+                                                <div className="ad-kv__k">
+                                                    Ghi chú
+                                                </div>
+                                                <div className="ad-kv__v">
+                                                    {booking.note}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
-                    {result && room && (
+                    {result && (
                         <p className="ad-hint" style={{ marginTop: 12 }}>
-                            {room.label} ·{' '}
-                            {room.type === 'bungalow' ? 'Bungalow' : 'Phòng'}
+                            {result.room.label} · {result.meta}
                         </p>
-                    )}
-
-                    {missingDate && (
-                        <div
-                            className="ad-note ad-note--warn"
-                            style={{ marginTop: 16 }}
-                        >
-                            <b>Không tìm thấy ngày trong bảng tính.</b>
-                            <br />
-                            Cột ngày đang có: {missingDate.join(' · ')}
-                            {missingDate.length >= 12 ? ' …' : ''}
-                        </div>
                     )}
                 </div>
             </div>

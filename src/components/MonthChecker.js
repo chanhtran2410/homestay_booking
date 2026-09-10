@@ -4,14 +4,7 @@ import dayjs from 'dayjs';
 import { useAuth } from '../App';
 import AdminShell from '../admin/AdminShell';
 import { Loading } from '../admin/ui';
-import {
-    cellLabel,
-    formatVnd,
-    parseAmount,
-    parseCell,
-    readSheet,
-} from '../admin/sheets';
-import { readMonth } from '../admin/revenue';
+import { formatVnd, getMonth, shortRoomName } from '../admin/api';
 
 const DOW = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
@@ -23,7 +16,7 @@ const LEGEND = [
 ];
 
 const MonthChecker = () => {
-    const { isSignedIn, makeApiCall } = useAuth();
+    const { isSignedIn } = useAuth();
     const [month, setMonth] = useState(dayjs());
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState(null);
@@ -34,8 +27,7 @@ const MonthChecker = () => {
             setLoading(true);
             setSelected(null);
             try {
-                const { data, headers } = await readSheet(makeApiCall);
-                setView(readMonth(data, headers, target));
+                setView(await getMonth(target));
             } catch (error) {
                 console.error('Error loading month data:', error);
                 message.error(
@@ -46,7 +38,7 @@ const MonthChecker = () => {
                 setLoading(false);
             }
         },
-        [makeApiCall]
+        []
     );
 
     useEffect(() => {
@@ -109,7 +101,7 @@ const MonthChecker = () => {
         </>
     );
 
-    const detail = selected ? parseCell(selected.cell.value) : null;
+    const detail = selected ? selected.cell : null;
 
     return (
         <AdminShell
@@ -190,10 +182,7 @@ const MonthChecker = () => {
                             {view.rows.map(({ room, cells }) => (
                                 <div key={room.value} className="ad-mx__row">
                                     <div className="ad-mx__room">
-                                        <b>
-                                            {room.label.split(' - ')[1] ||
-                                                room.label}
-                                        </b>
+                                        <b>{shortRoomName(room.label)}</b>
                                         <span className="ad-num">
                                             {room.value}
                                         </span>
@@ -237,9 +226,8 @@ const MonthChecker = () => {
                                                     <span>
                                                         {cell.kind === 'unknown'
                                                             ? 'Không rõ'
-                                                            : cellLabel(
-                                                                  cell.value
-                                                              )}
+                                                            : cell.guestName ||
+                                                              'Trống'}
                                                     </span>
                                                 </button>
                                             </div>
@@ -267,16 +255,17 @@ const MonthChecker = () => {
                                     <span
                                         className={`ad-pill is-${selected.cell.kind}`}
                                     >
-                                        {selected.cell.kind === 'unknown'
-                                            ? 'Không rõ'
-                                            : detail.status}
+                                        {LEGEND.find(
+                                            (item) =>
+                                                item.kind === selected.cell.kind
+                                        )?.label || 'Không rõ'}
                                     </span>
                                 </div>
                                 <div
                                     className="ad-display"
                                     style={{ fontSize: 19, margin: '10px 0 0' }}
                                 >
-                                    {detail.customerName || 'Trống'}
+                                    {detail.guestName || 'Trống'}
                                 </div>
                                 <div
                                     className="ad-kv"
@@ -300,11 +289,7 @@ const MonthChecker = () => {
                                         <div className="ad-kv__k">Tiền cọc</div>
                                         <div className="ad-kv__v ad-num">
                                             {detail.deposit
-                                                ? formatVnd(
-                                                      parseAmount(
-                                                          detail.deposit
-                                                      )
-                                                  )
+                                                ? formatVnd(detail.deposit)
                                                 : '—'}
                                         </div>
                                     </div>
