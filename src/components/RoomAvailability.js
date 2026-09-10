@@ -1,157 +1,170 @@
-import { useState } from 'react';
-import { Form, Button, Typography, Select, message, DatePicker } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useState } from 'react';
+import { message } from 'antd';
 import { useAuth } from '../App';
+import AdminShell from '../admin/AdminShell';
+import { Btn, DateField, Field, RoomSelect, useBusy } from '../admin/ui';
+import {
+    availableDates,
+    cellAt,
+    findDateColumn,
+    findRoomRow,
+    parseCell,
+    readSheet,
+} from '../admin/sheets';
 import { ROOM_OPTIONS } from '../constants/roomOptions';
-import './styles.css';
-
-const { Title } = Typography;
-
-const SPREADSHEET_ID =
-    process.env.REACT_APP_SPREADSHEET_ID ||
-    '1re26jyCc2_gebIn5BRW7DTHAR6QmFTB7k5iSC3UhRrc';
-const SHEET_NAME = 'Sheet1';
 
 const RoomAvailability = () => {
-    const [form] = Form.useForm();
-    const [result, setResult] = useState('');
-    const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
     const { makeApiCall } = useAuth();
+    const [roomId, setRoomId] = useState(null);
+    const [date, setDate] = useState(null);
+    const [result, setResult] = useState(null);
+    const [missingDate, setMissingDate] = useState(null);
+    const [busy, run] = useBusy();
 
-    const onFinish = async ({ date, roomId }) => {
-        setLoading(true);
-        setResult(''); // Clear previous result
-
-        try {
-            const formattedDate = date.format('DD/MM/YYYY');
-
-            const readRes = await makeApiCall(() =>
-                window.gapi.client.sheets.spreadsheets.values.get({
-                    spreadsheetId: SPREADSHEET_ID,
-                    range: `${SHEET_NAME}`,
-                })
-            );
-
-            const data = readRes.result.values;
-
-            if (!data || data.length === 0) {
-                message.error('Không có dữ liệu trong bảng tính');
-                return;
-            }
-
-            const headers = data[0];
-            const dateIndex = headers.indexOf(formattedDate);
-            const roomRowIndex = data.findIndex(
-                (row) => row && row[1] === roomId
-            );
-
-            if (dateIndex === -1) {
-                message.error(
-                    `Không tìm thấy ngày "${formattedDate}" trong bảng tính`
-                );
-                return;
-            }
-
-            if (roomRowIndex === -1) {
-                message.error(
-                    `Không tìm thấy phòng "${roomId}" trong bảng tính`
-                );
-                return;
-            }
-
-            const cellValue = data?.[roomRowIndex]?.[dateIndex] || '';
-
-            // Enhanced result display with more context
-            if (
-                cellValue.trim() === '' ||
-                cellValue === undefined ||
-                cellValue === null
-            ) {
-                setResult('🟢 Phòng trống');
-            } else {
-                setResult(`🔴 Đã đặt: ${cellValue}`);
-            }
-
-            console.log(`Room ${roomId} on ${date}: "${cellValue}"`);
-        } catch (error) {
-            console.error('Error reading sheet:', error);
-            message.error('Lỗi khi kiểm tra phòng. Vui lòng thử lại.');
-        } finally {
-            setLoading(false);
+    const onCheck = useCallback(async () => {
+        if (!roomId) {
+            message.error('Vui lòng chọn phòng');
+            return;
         }
-    };
+        if (!date) {
+            message.error('Vui lòng chọn ngày');
+            return;
+        }
+
+        await run(async () => {
+            setResult(null);
+            setMissingDate(null);
+            try {
+                const { data, headers } = await readSheet(makeApiCall);
+                const { index: dateIndex, format } = findDateColumn(
+                    headers,
+                    date
+                );
+
+                if (dateIndex === -1) {
+                    setMissingDate(availableDates(headers).slice(0, 12));
+                    message.error(
+                        `Không tìm thấy ngày "${date.format(
+                            'DD/MM/YYYY'
+                        )}" trong bảng tính`
+                    );
+                    return;
+                }
+
+                const roomRowIndex = findRoomRow(data, roomId);
+                if (roomRowIndex === -1) {
+                    message.error(
+                        `Không tìm thấy phòng "${roomId}" trong bảng tính`
+                    );
+                    return;
+                }
+
+                const value = cellAt(data, roomRowIndex, dateIndex);
+                setResult({
+                    ...parseCell(value),
+                    roomId,
+                    date: format || date.format('DD/MM/YYYY'),
+                });
+            } catch (error) {
+                console.error('Error reading sheet:', error);
+                message.error(
+                    error.message || 'Lỗi khi kiểm tra phòng. Vui lòng thử lại.'
+                );
+            }
+        });
+    }, [roomId, date, makeApiCall, run]);
+
+    const room = ROOM_OPTIONS.find((option) => option.value === roomId);
 
     return (
-        <div className="content-container">
-            <div className="page-wrapper">
-                <Button
-                    icon={<ArrowLeftOutlined />}
-                    onClick={() => navigate('/')}
-                    type="text"
-                    className="back-button"
-                >
-                    Về trang chủ
-                </Button>
-                <Title level={3} className="page-title">
-                    📅 Kiểm tra tình trạng phòng
-                </Title>
+        <AdminShell back eyebrow="TRA CỨU NHANH" title="Kiểm tra phòng">
+            <div className="ad-cols">
+                <div>
+                    <Field label="Phòng">
+                        <RoomSelect value={roomId} onChange={setRoomId} />
+                    </Field>
 
-                <Form form={form} layout="vertical" onFinish={onFinish}>
-                    <Form.Item
-                        name="roomId"
-                        label="Phòng"
-                        rules={[{ required: true, message: 'Chọn phòng' }]}
+                    <Field label="Ngày">
+                        <DateField value={date} onChange={setDate} />
+                    </Field>
+
+                    <Btn
+                        variant="accent"
+                        block
+                        loading={busy}
+                        style={{ marginTop: 18 }}
+                        onClick={onCheck}
                     >
-                        <Select placeholder="Chọn phòng" size="large">
-                            {ROOM_OPTIONS.map((room) => (
-                                <Select.Option
-                                    key={room.value}
-                                    value={room.value}
-                                >
-                                    {room.label}
-                                </Select.Option>
-                            ))}
-                        </Select>
-                    </Form.Item>
+                        {busy ? 'Đang kiểm tra…' : 'Kiểm tra'}
+                    </Btn>
+                </div>
 
-                    <Form.Item
-                        name="date"
-                        label="Ngày (tiêu đề cột)"
-                        rules={[{ required: true, message: 'Nhập ngày' }]}
-                        extra="Nhập ngày theo định dạng trong bảng tính (ví dụ: 1/5, 2/1, etc.)"
-                    >
-                        <DatePicker
-                            format="DD/MM/YYYY"
-                            placeholder="Chọn ngày"
-                            size="large"
-                            style={{ width: '100%' }}
-                        />
-                    </Form.Item>
-
-                    <Form.Item>
-                        <Button
-                            type="primary"
-                            htmlType="submit"
-                            size="large"
-                            block
-                            loading={loading}
+                <div>
+                    {result && result.kind === 'free' && (
+                        <div
+                            className="ad-result ad-result--free"
+                            style={{ marginTop: 16 }}
                         >
-                            {loading ? 'Đang kiểm tra...' : 'Kiểm tra'}
-                        </Button>
-                    </Form.Item>
-                </Form>
-
-                {result && (
-                    <div className="result-display">
-                        <div className="result-text">
-                            ✅ Trạng thái: {result}
+                            <div className="ad-result__head">
+                                <span className="ad-result__ico">✓</span>
+                                <div>
+                                    <div className="ad-result__title">
+                                        Phòng trống
+                                    </div>
+                                    <div className="ad-result__sub ad-num">
+                                        {result.roomId} · {result.date}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+
+                    {result && result.kind !== 'free' && (
+                        <div
+                            className="ad-result ad-result--busy"
+                            style={{ marginTop: 16 }}
+                        >
+                            <div className="ad-result__head">
+                                <span className="ad-result__ico">●</span>
+                                <div>
+                                    <div className="ad-result__title">
+                                        {result.kind === 'booked'
+                                            ? 'Đã có khách'
+                                            : 'Đang đợi cọc'}
+                                    </div>
+                                    <div className="ad-result__sub ad-num">
+                                        {result.roomId} · {result.date}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="ad-result__cell">
+                                <div className="ad-card__k">NỘI DUNG Ô</div>
+                                <div>{result.raw}</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {result && room && (
+                        <p className="ad-hint" style={{ marginTop: 12 }}>
+                            {room.label} ·{' '}
+                            {room.type === 'bungalow' ? 'Bungalow' : 'Phòng'}
+                        </p>
+                    )}
+
+                    {missingDate && (
+                        <div
+                            className="ad-note ad-note--warn"
+                            style={{ marginTop: 16 }}
+                        >
+                            <b>Không tìm thấy ngày trong bảng tính.</b>
+                            <br />
+                            Cột ngày đang có: {missingDate.join(' · ')}
+                            {missingDate.length >= 12 ? ' …' : ''}
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
+        </AdminShell>
     );
 };
 

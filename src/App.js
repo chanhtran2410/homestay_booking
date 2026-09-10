@@ -7,18 +7,18 @@ import React, {
     useCallback,
 } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Modal, Button, Typography, message } from 'antd';
-import { GoogleOutlined } from '@ant-design/icons';
+import { ConfigProvider, message } from 'antd';
 import Booking from './components/Booking';
 import './App.css'; // import the stylesheet
 import RoomAvailability from './components/RoomAvailability';
 import DateRoomChecker from './components/DateRoomChecker';
 import RemoveBooking from './components/RemoveBooking';
 import MonthChecker from './components/MonthChecker';
+import Reports from './components/Reports';
 import RoomGallery from './components/RoomGallery';
 import Home from './Home/Home';
-
-const { Title, Text } = Typography;
+import LoginScreen, { AdminSplash } from './admin/LoginScreen';
+import { ADMIN_THEME } from './admin/theme';
 
 const CLIENT_ID =
     process.env.REACT_APP_GOOGLE_CLIENT_ID ||
@@ -100,7 +100,7 @@ const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [accessToken, setAccessToken] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [loginTime, setLoginTime] = useState(null);
     const [apiInitialized, setApiInitialized] = useState(false);
 
     // Initialize Google Services
@@ -147,8 +147,8 @@ const AuthProvider = ({ children }) => {
 
                     setAccessToken(storedAuth.token);
                     setUser(storedAuth.user);
+                    setLoginTime(storedAuth.loginTime);
                     setIsSignedIn(true);
-                    setShowLoginModal(false);
                     console.log('Authentication restored from localStorage');
                 } else {
                     // Check if user is already signed in via gapi
@@ -156,9 +156,7 @@ const AuthProvider = ({ children }) => {
                     if (token) {
                         setIsSignedIn(true);
                         setAccessToken(token.access_token);
-                        setShowLoginModal(false);
-                    } else {
-                        setShowLoginModal(true);
+                        setLoginTime(Date.now());
                     }
                 }
 
@@ -166,7 +164,6 @@ const AuthProvider = ({ children }) => {
             } catch (error) {
                 console.error('Failed to initialize Google services:', error);
                 message.error('Failed to initialize Google services');
-                setShowLoginModal(true);
             } finally {
                 setIsLoading(false);
             }
@@ -200,8 +197,8 @@ const AuthProvider = ({ children }) => {
                     // Update state
                     setAccessToken(response.access_token);
                     setUser(userInfo);
+                    setLoginTime(Date.now());
                     setIsSignedIn(true);
-                    setShowLoginModal(false);
                     message.success('Đăng nhập thành công!');
 
                     // Set the access token for gapi requests
@@ -231,7 +228,7 @@ const AuthProvider = ({ children }) => {
         setAccessToken(null);
         setIsSignedIn(false);
         setUser(null);
-        setShowLoginModal(true);
+        setLoginTime(null);
         message.success('Đăng xuất thành công');
     }, [accessToken]);
 
@@ -247,7 +244,7 @@ const AuthProvider = ({ children }) => {
         setAccessToken(null);
         setIsSignedIn(false);
         setUser(null);
-        setShowLoginModal(true);
+        setLoginTime(null);
 
         message.warning('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
     }, []);
@@ -320,6 +317,7 @@ const AuthProvider = ({ children }) => {
             handleLogin,
             handleLogout,
             isLoading,
+            loginTime,
             makeApiCall,
             handleTokenExpiration,
         }),
@@ -331,6 +329,7 @@ const AuthProvider = ({ children }) => {
             handleLogin,
             handleLogout,
             isLoading,
+            loginTime,
             makeApiCall,
             handleTokenExpiration,
         ]
@@ -338,141 +337,64 @@ const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {children}
-
-            {/* Global Login Modal */}
-            <Modal
-                title={
-                    <div style={{ textAlign: 'center' }}>
-                        <GoogleOutlined
-                            style={{
-                                fontSize: 24,
-                                color: '#fff',
-                                marginRight: 8,
-                            }}
-                        />
-                        <Title
-                            level={4}
-                            style={{
-                                margin: 0,
-                                display: 'inline',
-                                color: '#fff',
-                            }}
-                        >
-                            Đăng nhập để tiếp tục
-                        </Title>
-                    </div>
-                }
-                open={showLoginModal}
-                onCancel={null}
-                footer={null}
-                closable={false}
-                centered
-                width={400}
-            >
-                <div
-                    style={{
-                        textAlign: 'center',
-                        padding: '20px 0',
-                    }}
-                >
-                    <Text
-                        style={{
-                            fontSize: 16,
-                            color: '#666',
-                            display: 'block',
-                            marginBottom: 24,
-                        }}
-                    >
-                        Bạn cần đăng nhập Google để sử dụng ứng dụng quản lý
-                        homestay
-                    </Text>
-
-                    <Button
-                        type="primary"
-                        size="large"
-                        icon={<GoogleOutlined />}
-                        onClick={handleLogin}
-                        style={{
-                            backgroundColor: '#4285f4',
-                            borderColor: '#4285f4',
-                            height: 48,
-                            fontSize: 16,
-                            paddingLeft: 24,
-                            paddingRight: 24,
-                        }}
-                    >
-                        Đăng nhập với Google
-                    </Button>
-
-                    <div style={{ marginTop: 16, fontSize: 12, color: '#999' }}>
-                        Ứng dụng cần quyền truy cập Google Sheets để quản lý dữ
-                        liệu đặt phòng
-                    </div>
-                </div>
-            </Modal>
+            {isLoading ? (
+                <AdminSplash />
+            ) : isSignedIn ? (
+                children
+            ) : (
+                <LoginScreen onLogin={handleLogin} />
+            )}
         </AuthContext.Provider>
     );
 };
 
 const App = () => {
     return (
-        <Router>
-            <Routes>
-                {/* Public routes - no authentication required */}
-                <Route path="/rooms" element={<RoomGallery />} />
+        <ConfigProvider theme={ADMIN_THEME}>
+            <Router>
+                <Routes>
+                    {/* Public routes - no authentication required */}
+                    <Route path="/rooms" element={<RoomGallery />} />
 
-                {/* Protected routes - authentication required */}
-                <Route
-                    path="/*"
-                    element={
-                        <AuthProvider>
-                            <Routes>
-                                <Route path="/" element={<Home />} />
-                                <Route path="/booking" element={<Booking />} />
-                                <Route
-                                    path="/availability"
-                                    element={<RoomAvailability />}
-                                />
-                                <Route
-                                    path="/date_checking"
-                                    element={<DateRoomChecker />}
-                                />
-                                <Route
-                                    path="/month-checking"
-                                    element={<MonthChecker />}
-                                />
-                                <Route
-                                    path="/remove-booking"
-                                    element={<RemoveBooking />}
-                                />
-                                <Route
-                                    path="/reports"
-                                    element={<Placeholder title="Reports" />}
-                                />
-                                <Route
-                                    path="/settings"
-                                    element={<Placeholder title="Settings" />}
-                                />
-                                <Route
-                                    path="/about"
-                                    element={<Placeholder title="About" />}
-                                />
-                            </Routes>
-                        </AuthProvider>
-                    }
-                />
-            </Routes>
-        </Router>
+                    {/* Protected routes - authentication required */}
+                    <Route
+                        path="/*"
+                        element={
+                            <AuthProvider>
+                                <Routes>
+                                    <Route path="/" element={<Home />} />
+                                    <Route
+                                        path="/booking"
+                                        element={<Booking />}
+                                    />
+                                    <Route
+                                        path="/availability"
+                                        element={<RoomAvailability />}
+                                    />
+                                    <Route
+                                        path="/date_checking"
+                                        element={<DateRoomChecker />}
+                                    />
+                                    <Route
+                                        path="/month-checking"
+                                        element={<MonthChecker />}
+                                    />
+                                    <Route
+                                        path="/remove-booking"
+                                        element={<RemoveBooking />}
+                                    />
+                                    <Route
+                                        path="/reports"
+                                        element={<Reports />}
+                                    />
+                                </Routes>
+                            </AuthProvider>
+                        }
+                    />
+                </Routes>
+            </Router>
+        </ConfigProvider>
     );
 };
-
-// Temporary placeholder component
-const Placeholder = ({ title }) => (
-    <div className="placeholder-page">
-        <h2>{title} Page</h2>
-        <p>Coming soon...</p>
-    </div>
-);
 
 export default App;
