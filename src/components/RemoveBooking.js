@@ -112,8 +112,8 @@ const RemoveBooking = () => {
         <AdminShell back eyebrow="KHÔNG THỂ HOÀN TÁC" title="Xoá đặt phòng">
             <div className="ad-cols">
                 <div>
-                    <div style={{ display: 'flex', gap: 10 }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="ad-pair">
+                        <div>
                             <label className="ad-label">Phòng</label>
                             <RoomSelect
                                 options={rooms}
@@ -121,7 +121,7 @@ const RemoveBooking = () => {
                                 onChange={setRoomId}
                             />
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div>
                             <label className="ad-label">Ngày</label>
                             <DateField value={date} onChange={setDate} />
                         </div>

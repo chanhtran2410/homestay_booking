@@ -56,6 +56,7 @@ const RoomAvailability = require('./components/RoomAvailability').default;
 const DateRoomChecker = require('./components/DateRoomChecker').default;
 const RemoveBooking = require('./components/RemoveBooking').default;
 const Reports = require('./components/Reports').default;
+const RoomGallery = require('./components/RoomGallery').default;
 
 /* ------------------------------------------------------------------ *
  * Dữ liệu giả — đúng hình dạng mà /api trả về
@@ -65,6 +66,24 @@ const OPTIONS = [
     { value: '1001', label: '1001 - Bungalow Bằng Lăng', type: 'bungalow' },
     { value: '1002', label: '1002 - Bungalow Nguyệt Quế', type: 'bungalow' },
     { value: '1005', label: '1005 - Phòng số 2', type: 'room' },
+];
+
+const PUBLIC_ROOMS = [
+    {
+        id: '1001',
+        name: 'Bungalow Bằng Lăng',
+        type: 'bungalow',
+        bedType: '2 giường',
+        pricing: { weekday: 800000, weekend: 1000000, holiday: 1500000 },
+        extraPersonFee: 150000,
+        currency: 'VND',
+        capacity: 4,
+        size: '45m²',
+        description: 'Bungalow lớn nhất.',
+        amenities: ['WiFi miễn phí'],
+        images: ['https://example.test/a.jpg'],
+        thumbnail: 'https://example.test/a-small.jpg',
+    },
 ];
 
 const today = dayjs();
@@ -184,6 +203,7 @@ beforeEach(() => {
     api.getAvailability
         .mockReset()
         .mockResolvedValue({ ok: true, date: todayStr, rooms: dayRows() });
+    api.getPublicRooms.mockReset().mockResolvedValue(PUBLIC_ROOMS);
     api.findBooking.mockReset();
     api.createBooking.mockReset();
     api.deleteNight.mockReset();
@@ -425,5 +445,65 @@ describe('luồng ghi dữ liệu', () => {
         await waitFor(() => expect(api.deleteNight).toHaveBeenCalled());
         expect(api.deleteNight).toHaveBeenCalledWith('1001', expect.anything());
         expect(api.deleteBooking).not.toHaveBeenCalled();
+    });
+});
+
+describe('trang landing công khai', () => {
+    // Trước đây danh sách phòng là hằng số biên dịch sẵn nên luôn tồn tại.
+    // Giờ nó đến từ /api nên lần render đầu tiên mảng còn rỗng — chính chỗ
+    // này từng làm trang /rooms sập với "Cannot read properties of undefined".
+    test('không sập khi dữ liệu phòng chưa về', async () => {
+        api.getPublicRooms.mockReturnValue(new Promise(() => {})); // treo mãi
+        render(<RoomGallery />);
+        expect(
+            await screen.findByText(/Đang tải danh sách phòng/)
+        ).toBeInTheDocument();
+        // Phần tĩnh của trang vẫn phải hiện bình thường
+        expect(screen.getByText('Tìm đến đồi')).toBeInTheDocument();
+    });
+
+    test('hiện tên phòng sau khi dữ liệu về', async () => {
+        render(<RoomGallery />);
+        expect(
+            await screen.findByRole('heading', { name: 'Bungalow Bằng Lăng' })
+        ).toBeInTheDocument();
+        // "4 khách" có ở cả thẻ phòng lẫn dòng mô tả -> chỉ xét dòng mô tả
+        expect(document.querySelector('.bl-rooms__meta').textContent).toMatch(
+            /4 khách/
+        );
+        expect(
+            screen.queryByText(/Đang tải danh sách phòng/)
+        ).not.toBeInTheDocument();
+    });
+
+    // Mỗi ký tự của wordmark là một <span> riêng để chạy animation. Nếu không
+    // gom theo từ, trình duyệt ngắt dòng được ở giữa từ ("BẰNG LĂNG H / ILL").
+    test('wordmark gom theo từ để không ngắt giữa chừng', async () => {
+        render(<RoomGallery />);
+        await screen.findByText('Tìm đến đồi');
+
+        const words = [...document.querySelectorAll('.bl-wordmark__word')];
+        expect(words.map((w) => w.textContent)).toEqual([
+            'BẰNG',
+            'LĂNG',
+            'HILL',
+        ]);
+
+        // Độ trễ animation vẫn tăng liên tục xuyên qua các từ
+        const chars = [...document.querySelectorAll('.bl-wordmark__char')];
+        expect(chars).toHaveLength(12);
+        const delays = chars.map((c) =>
+            parseFloat(c.style.animationDelay)
+        );
+        expect(delays).toEqual([...delays].sort((a, b) => a - b));
+    });
+
+    test('gọi API hỏng thì báo lỗi kèm nút thử lại, không sập', async () => {
+        api.getPublicRooms.mockRejectedValue(new Error('mạng lỗi'));
+        render(<RoomGallery />);
+        expect(
+            await screen.findByText(/Không tải được danh sách phòng/)
+        ).toBeInTheDocument();
+        expect(screen.getByText('Thử lại')).toBeInTheDocument();
     });
 });

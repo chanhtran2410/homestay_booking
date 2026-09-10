@@ -25,6 +25,17 @@ import './RoomGallery.css';
 
 const WORDMARK = 'BẰNG LĂNG HILL';
 
+// Mỗi ký tự là một <span> riêng để chạy animation từng chữ. Nhưng như vậy
+// trình duyệt được phép ngắt dòng ở GIỮA từ ("BẰNG LĂNG H / ILL"). Nên gom
+// lại theo từ, mỗi từ là một khối nowrap — chỉ ngắt được ở khoảng trắng.
+const wordmarkParts = () => {
+    let index = 0;
+    return WORDMARK.split(' ').map((word) => ({
+        word,
+        chars: Array.from(word).map((char) => ({ char, index: index++ })),
+    }));
+};
+
 const clamp01 = (value) => Math.min(1, Math.max(0, value));
 
 // 0903664474 -> 0903 664 474
@@ -149,6 +160,9 @@ const RoomGallery = () => {
     const viewportH = useViewportHeight();
 
     const [roomData, setRoomData] = useState([]);
+    // 'loading' | 'ready' | 'error' — mảng rỗng không phân biệt được hai
+    // trạng thái sau, mà cách hiển thị thì khác nhau.
+    const [roomsStatus, setRoomsStatus] = useState('loading');
     const [category, setCategory] = useState('all');
     const [active, setActive] = useState(0);
     const [detailId, setDetailId] = useState(null);
@@ -170,10 +184,14 @@ const RoomGallery = () => {
     // và được CDN của Vercel cache 5 phút.
     useEffect(() => {
         getPublicRooms()
-            .then(setRoomData)
+            .then((data) => {
+                setRoomData(data);
+                setRoomsStatus('ready');
+            })
             .catch((error) => {
                 console.error('Không tải được danh sách phòng:', error);
                 setRoomData([]);
+                setRoomsStatus('error');
             });
     }, []);
 
@@ -217,7 +235,7 @@ const RoomGallery = () => {
 
     const phone = formatPhone(CONTACT_INFO.phone);
     const activeIndex = Math.min(active, Math.max(0, list.length - 1));
-    const activeRoom = list[activeIndex] || rooms[0];
+    const activeRoom = list[activeIndex] || rooms[0] || null;
     const detail = detailId
         ? rooms.find((room) => room.id === detailId) || null
         : null;
@@ -365,27 +383,29 @@ const RoomGallery = () => {
                     }}
                 >
                     <h1 className="bl-wordmark">
-                        {Array.from(WORDMARK).map((char, index) =>
-                            char === ' ' ? (
-                                <span
-                                    key={`space-${index}`}
-                                    className="bl-wordmark__space"
-                                />
-                            ) : (
-                                <span
-                                    key={`${char}-${index}`}
-                                    className="bl-wordmark__char"
-                                    style={{
-                                        animationDelay: `${(
-                                            0.08 +
-                                            index * 0.045
-                                        ).toFixed(2)}s`,
-                                    }}
-                                >
-                                    {char}
+                        {wordmarkParts().map(({ word, chars }, wordIndex) => (
+                            <React.Fragment key={word}>
+                                {wordIndex > 0 && (
+                                    <span className="bl-wordmark__space" />
+                                )}
+                                <span className="bl-wordmark__word">
+                                    {chars.map(({ char, index }) => (
+                                        <span
+                                            key={`${char}-${index}`}
+                                            className="bl-wordmark__char"
+                                            style={{
+                                                animationDelay: `${(
+                                                    0.08 +
+                                                    index * 0.045
+                                                ).toFixed(2)}s`,
+                                            }}
+                                        >
+                                            {char}
+                                        </span>
+                                    ))}
                                 </span>
-                            )
-                        )}
+                            </React.Fragment>
+                        ))}
                     </h1>
                     <p className="bl-hero__place">{LOCATION.region}</p>
                 </div>
@@ -487,6 +507,38 @@ const RoomGallery = () => {
                     </div>
 
                     <div className="bl-rooms__inner">
+                        {!activeRoom ? (
+                            <div className="bl-rooms__status">
+                                {roomsStatus === 'error' ? (
+                                    <>
+                                        <p>Không tải được danh sách phòng.</p>
+                                        <button
+                                            type="button"
+                                            className="bl-btn bl-btn--ghost"
+                                            onClick={() => {
+                                                setRoomsStatus('loading');
+                                                getPublicRooms()
+                                                    .then((data) => {
+                                                        setRoomData(data);
+                                                        setRoomsStatus('ready');
+                                                    })
+                                                    .catch(() =>
+                                                        setRoomsStatus('error')
+                                                    );
+                                            }}
+                                        >
+                                            Thử lại
+                                        </button>
+                                        <p className="bl-rooms__status-sub">
+                                            Gọi {phone} để được tư vấn trực tiếp.
+                                        </p>
+                                    </>
+                                ) : (
+                                    <p>Đang tải danh sách phòng…</p>
+                                )}
+                            </div>
+                        ) : (
+                        <>
                         <div className="bl-rooms__head" data-reveal>
                             <div>
                                 <p className="bl-eyebrow bl-eyebrow--light">
@@ -616,6 +668,8 @@ const RoomGallery = () => {
                                 Bấm thẻ để xem chi tiết
                             </span>
                         </div>
+                        </>
+                        )}
                     </div>
                 </section>
 

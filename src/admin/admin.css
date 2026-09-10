@@ -768,8 +768,25 @@ body.ad-on {
 
 .ad-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     margin-top: 18px;
+}
+
+/* Hai ô cạnh nhau (ngày + số đêm, phòng + ngày). Xếp dọc trên máy hẹp vì
+   stepper rộng cố định 138px sẽ ép ô còn lại xuống dưới 130px. */
+.ad-pair {
+    display: flex;
+    gap: 12px;
+}
+
+.ad-pair > * {
+    flex: 1;
+    min-width: 0;
+}
+
+.ad-pair > .ad-pair__fixed {
+    flex: none;
 }
 
 /* --- chips --- */
@@ -2264,6 +2281,18 @@ button.ad-row:active {
         gap: 20px;
     }
 
+    /* Nhãn nút là nowrap nên hai nút cạnh nhau tràn ngang ở màn hẹp.
+       Ví dụ "Xoá đêm này" + "Xoá cả 3 đêm" cần ~294px trong khi màn 320px
+       chỉ còn 280px sau padding. */
+    .ad-actions .ad-btn {
+        flex: 1 1 100%;
+    }
+
+    /* Khoá tháng/ngày và các nhãn dài không được đẩy trang rộng ra */
+    .ad-mhead__title {
+        overflow-wrap: anywhere;
+    }
+
     /* số liệu đã nằm trong header tối */
     .ad-stats--top {
         display: none;
@@ -2271,6 +2300,45 @@ button.ad-row:active {
 
     .ad-sheet__panel {
         max-width: none;
+    }
+}
+
+/* Màn rất hẹp (iPhone SE 320px, và khi người dùng phóng to chữ) */
+@media (max-width: 479px) {
+    .ad-pair {
+        flex-direction: column;
+    }
+
+    .ad-pair > .ad-pair__fixed {
+        align-self: flex-start;
+    }
+
+    /* Hai cột khoá/giá trị lồng trong thẻ kết quả chỉ còn ~103px mỗi cột */
+    .ad-kv {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .ad-content {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .ad-result {
+        padding: 18px;
+    }
+
+    .ad-result__cell {
+        padding: 13px;
+    }
+
+    .ad-seg button {
+        font-size: 13px;
+        padding: 0 8px;
+    }
+
+    .ad-legend {
+        gap: 10px;
     }
 }
 

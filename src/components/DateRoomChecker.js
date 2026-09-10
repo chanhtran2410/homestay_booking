@@ -55,11 +55,12 @@ const DateRoomChecker = () => {
             eyebrow="QUÉT CẢ 6 PHÒNG"
             title="Phòng trống theo ngày"
             headerExtra={
-                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="ad-pair" style={{ marginTop: 16 }}>
+                    <div>
                         <DateField value={date} onChange={setDate} />
                     </div>
                     <Btn
+                        className="ad-pair__fixed"
                         variant="accent"
                         size="sm"
                         loading={busy}

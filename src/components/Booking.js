@@ -158,15 +158,15 @@ const Booking = memo(() => {
                         />
                     </Field>
 
-                    <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="ad-pair" style={{ marginTop: 16 }}>
+                        <div>
                             <label className="ad-label">Ngày nhận phòng</label>
                             <DateField
                                 value={form.fromDate}
                                 onChange={(fromDate) => set({ fromDate })}
                             />
                         </div>
-                        <div style={{ flex: 'none' }}>
+                        <div className="ad-pair__fixed">
                             <label className="ad-label">Số đêm</label>
                             <NightStepper
                                 value={form.nights}
