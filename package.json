@@ -2,24 +2,34 @@
     "name": "homestay-booking",
     "version": "0.1.0",
     "private": true,
+    "engines": {
+        "node": "22.x"
+    },
+    "proxy": "http://localhost:3001",
     "dependencies": {
+        "@supabase/supabase-js": "^2.116.0",
         "@testing-library/dom": "^10.4.0",
         "@testing-library/jest-dom": "^6.6.3",
         "@testing-library/react": "^16.3.0",
         "@testing-library/user-event": "^13.5.0",
         "antd": "^5.26.3",
-        "axios": "^1.10.0",
         "dayjs": "^1.11.13",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
         "react-router-dom": "^7.6.3",
-        "react-scripts": "5.0.1",
-        "web-vitals": "^2.1.4"
+        "react-scripts": "5.0.1"
     },
     "scripts": {
-        "start": "react-scripts start",
+        "start": "node scripts/dev.cjs",
+        "start:web": "react-scripts start",
+        "dev:api": "node scripts/dev-api.cjs",
+        "dev:vercel": "vercel dev",
         "build": "react-scripts build",
         "test": "react-scripts test",
+        "test:import": "node scripts/import-sheet.test.cjs",
+        "seed:rooms": "node scripts/gen-rooms-seed.cjs",
+        "import:dry": "node scripts/import-sheet.cjs --dry-run",
+        "import:commit": "node scripts/import-sheet.cjs --commit",
         "eject": "react-scripts eject"
     },
     "eslintConfig": {

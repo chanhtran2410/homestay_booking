@@ -1,0 +1,16 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "framework": "create-react-app",
+    "buildCommand": "npm run build",
+    "outputDirectory": "build",
+    "regions": ["hnd1"],
+    "functions": {
+        "api/**/*.js": {
+            "maxDuration": 30,
+            "memory": 1024
+        }
+    },
+    "rewrites": [
+        { "source": "/((?!api/).*)", "destination": "/index.html" }
+    ]
+}

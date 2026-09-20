@@ -1,421 +1,310 @@
-import { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { message } from 'antd';
+import AdminShell from '../admin/AdminShell';
 import {
-    Form,
-    Button,
-    Typography,
-    Select,
-    DatePicker,
-    Card,
-    message,
-    Modal,
-} from 'antd';
+    Btn,
+    ConfirmSheet,
+    DateField,
+    RoomSelect,
+    useBusy,
+} from '../admin/ui';
 import {
-    DeleteOutlined,
-    ExclamationCircleOutlined,
-    CheckCircleOutlined,
-    ArrowLeftOutlined,
-} from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import { ROOM_OPTIONS } from '../constants/roomOptions';
-import './styles.css';
-// import { useAuth } from '../App';
+    deleteBooking,
+    deleteNight,
+    findBooking,
+    formatVnd,
+    getRooms,
+    toApiDate,
+} from '../admin/api';
 
-const { Title, Text } = Typography;
-const { confirm } = Modal;
-
-const SPREADSHEET_ID =
-    process.env.REACT_APP_SPREADSHEET_ID ||
-    '1re26jyCc2_gebIn5BRW7DTHAR6QmFTB7k5iSC3UhRrc';
-const SHEET_NAME = 'Sheet1';
+const STEPS = [
+    'Chọn phòng và ngày cần xoá',
+    'Bấm tìm booking, đối chiếu tên khách',
+    'Chọn xoá một đêm hoặc xoá cả kỳ lưu trú',
+    'Xác nhận lần hai trong hộp thoại',
+];
 
 const RemoveBooking = () => {
-    const [form] = Form.useForm();
-    const [loading, setLoading] = useState(false);
-    const [currentBooking, setCurrentBooking] = useState(null);
-    const [bookingFound, setBookingFound] = useState(false);
-    const navigate = useNavigate();
-    // const { makeApiCall } = useAuth();
+    const [rooms, setRooms] = useState([]);
+    const [roomId, setRoomId] = useState(null);
+    const [date, setDate] = useState(null);
+    const [found, setFound] = useState(null);
+    const [emptyCell, setEmptyCell] = useState(false);
+    const [confirming, setConfirming] = useState(null); // 'night' | 'stay'
+    const [busy, run] = useBusy();
 
-    // Function to convert column index to Excel column letter(s)
-    const getColumnLetter = (columnIndex) => {
-        let result = '';
-        let index = columnIndex;
+    useEffect(() => {
+        getRooms()
+            .then((data) => setRooms(data.options))
+            .catch(() => setRooms([]));
+    }, []);
 
-        while (index >= 0) {
-            result = String.fromCharCode(65 + (index % 26)) + result;
-            index = Math.floor(index / 26) - 1;
+    const onFind = useCallback(async () => {
+        if (!roomId) {
+            message.error('Vui lòng chọn phòng');
+            return;
+        }
+        if (!date) {
+            message.error('Vui lòng chọn ngày');
+            return;
         }
 
-        return result;
-    };
-
-    const checkCurrentBooking = async ({ date, roomId }) => {
-        // Try multiple date formats to match the spreadsheet headers
-        const possibleFormats = [
-            date.format('DD/MM/YYYY'), // 01/05/2025
-            date.format('D/M/YYYY'), // 1/5/2025
-            date.format('DD/MM'), // 01/05
-            date.format('D/M'), // 1/5
-            date.format('MM/DD/YYYY'), // 05/01/2025
-            date.format('M/D/YYYY'), // 5/1/2025
-            date.format('YYYY-MM-DD'), // 2025-01-05
-        ];
-
-        setLoading(true);
-        setCurrentBooking(null);
-        setBookingFound(false);
-
-        try {
-            const readRes =
-                await window.gapi.client.sheets.spreadsheets.values.get({
-                    spreadsheetId: SPREADSHEET_ID,
-                    range: `${SHEET_NAME}`,
-                });
-
-            const data = readRes.result.values;
-
-            if (!data || data.length === 0) {
-                message.error('Không có dữ liệu trong bảng tính');
-                return;
-            }
-
-            const headers = data[0];
-            console.log('Available headers:', headers);
-            console.log('Trying date formats:', possibleFormats);
-
-            // Try to find the date in any of the possible formats
-            let dateIndex = -1;
-            let matchedFormat = '';
-
-            for (const format of possibleFormats) {
-                dateIndex = headers.indexOf(format);
-                if (dateIndex !== -1) {
-                    matchedFormat = format;
-                    break;
+        await run(async () => {
+            setFound(null);
+            setEmptyCell(false);
+            try {
+                const data = await findBooking(roomId, date);
+                if (!data.found) {
+                    setEmptyCell(true);
+                    message.info(
+                        `Phòng ${roomId} ngày ${toApiDate(date)} hiện đang trống`
+                    );
+                    return;
                 }
-            }
-
-            const roomRowIndex = data.findIndex(
-                (row) => row && row[1] === roomId
-            );
-
-            console.log('Matched date format:', matchedFormat);
-            console.log('Date index:', dateIndex);
-            console.log('Room row index:', roomRowIndex);
-
-            if (dateIndex === -1) {
+                setFound(data);
+                message.success('Đã tìm thấy booking cần xoá');
+            } catch (error) {
+                console.error('Error checking booking:', error);
                 message.error(
-                    `Không tìm thấy ngày trong bảng tính. Đã thử các định dạng: ${possibleFormats.join(
-                        ', '
-                    )}. Các cột có sẵn: ${headers.slice(2).join(', ')}`
+                    error.message ||
+                        'Lỗi khi kiểm tra booking. Vui lòng thử lại.'
                 );
-                return;
             }
-
-            if (roomRowIndex === -1) {
-                message.error(
-                    `Không tìm thấy phòng "${roomId}" trong bảng tính`
-                );
-                return;
-            }
-
-            const cellValue = data?.[roomRowIndex]?.[dateIndex] || '';
-
-            if (
-                cellValue.trim() === '' ||
-                cellValue === undefined ||
-                cellValue === null
-            ) {
-                setCurrentBooking(null);
-                setBookingFound(false);
-                message.info(
-                    `Phòng ${roomId} ngày ${matchedFormat} hiện đang trống`
-                );
-            } else {
-                const roomInfo = ROOM_OPTIONS.find(
-                    (room) => room.value === roomId
-                );
-                setCurrentBooking({
-                    roomId,
-                    roomLabel: roomInfo?.label || roomId,
-                    date: matchedFormat,
-                    dateIndex,
-                    roomRowIndex,
-                    value: cellValue,
-                    columnLetter: getColumnLetter(dateIndex),
-                });
-                setBookingFound(true);
-                message.success('Đã tìm thấy booking cần xóa');
-            }
-        } catch (error) {
-            console.error('Error checking booking:', error);
-            message.error('Lỗi khi kiểm tra booking. Vui lòng thử lại.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const confirmRemoval = () => {
-        confirm({
-            title: 'Xác nhận xóa booking',
-            icon: <ExclamationCircleOutlined />,
-            content: (
-                <div>
-                    <p>
-                        <strong>Bạn có chắc chắn muốn xóa booking này?</strong>
-                    </p>
-                    <div
-                        style={{
-                            background: '#f5f5f5',
-                            padding: 12,
-                            borderRadius: 6,
-                            margin: '12px 0',
-                        }}
-                    >
-                        <p>
-                            <strong>Phòng:</strong> {currentBooking?.roomLabel}
-                        </p>
-                        <p>
-                            <strong>Ngày:</strong> {currentBooking?.date}
-                        </p>
-                        <p>
-                            <strong>Thông tin booking:</strong>{' '}
-                            {currentBooking?.value}
-                        </p>
-                    </div>
-                    <p style={{ color: '#ff4d4f' }}>
-                        <ExclamationCircleOutlined style={{ marginRight: 4 }} />
-                        Hành động này không thể hoàn tác!
-                    </p>
-                </div>
-            ),
-            okText: 'Xóa booking',
-            okType: 'danger',
-            cancelText: 'Hủy',
-            width: 500,
-            onOk: performRemoval,
         });
-    };
+    }, [roomId, date, run]);
 
-    const performRemoval = async () => {
-        if (!currentBooking) return;
+    const onRemove = useCallback(async () => {
+        if (!found) return;
+        const scope = confirming;
 
-        setLoading(true);
-        try {
-            const range = `${SHEET_NAME}!${currentBooking.columnLetter}${
-                currentBooking.roomRowIndex + 1
-            }`;
+        await run(async () => {
+            try {
+                const result =
+                    scope === 'stay'
+                        ? await deleteBooking(found.booking.id)
+                        : await deleteNight(roomId, date);
 
-            console.log('Removing booking from range:', range);
+                message.success(
+                    scope === 'stay'
+                        ? `Đã xoá cả kỳ lưu trú (${result.nightsDeleted} đêm)`
+                        : result.bookingDeleted
+                        ? 'Đã xoá đêm cuối cùng, booking cũng được xoá theo'
+                        : `Đã xoá 1 đêm, còn lại ${result.nightsLeft} đêm`
+                );
 
-            await window.gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID,
-                range,
-                valueInputOption: 'RAW',
-                resource: {
-                    values: [['']], // Empty string to clear the cell
-                },
-            });
+                setFound(null);
+                setConfirming(null);
+                setRoomId(null);
+                setDate(null);
+            } catch (error) {
+                console.error('Error removing booking:', error);
+                message.error(
+                    error.message || 'Lỗi khi xoá booking. Vui lòng thử lại.'
+                );
+            }
+        });
+    }, [found, confirming, roomId, date, run]);
 
-            message.success('Đã xóa booking thành công!');
-
-            // Reset form and states
-            form.resetFields();
-            setCurrentBooking(null);
-            setBookingFound(false);
-        } catch (error) {
-            console.error('Error removing booking:', error);
-            message.error('Lỗi khi xóa booking. Vui lòng thử lại.');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const booking = found?.booking;
+    const multiNight = booking && booking.nights > 1;
 
     return (
-        <div className="content-container">
-            <div className="page-wrapper">
-                <Button
-                    icon={<ArrowLeftOutlined />}
-                    onClick={() => navigate('/')}
-                    type="text"
-                    className="back-button"
-                >
-                    Về trang chủ
-                </Button>
-                <Title level={3} className="page-title">
-                    <DeleteOutlined style={{ marginRight: 8 }} />
-                    Xóa đặt phòng
-                </Title>
+        <AdminShell back eyebrow="KHÔNG THỂ HOÀN TÁC" title="Xoá đặt phòng">
+            <div className="ad-cols">
+                <div>
+                    <div className="ad-pair">
+                        <div>
+                            <label className="ad-label">Phòng</label>
+                            <RoomSelect
+                                options={rooms}
+                                value={roomId}
+                                onChange={setRoomId}
+                            />
+                        </div>
+                        <div>
+                            <label className="ad-label">Ngày</label>
+                            <DateField value={date} onChange={setDate} />
+                        </div>
+                    </div>
 
-                <Form
-                    form={form}
-                    layout="vertical"
-                    onFinish={checkCurrentBooking}
-                >
-                    <Form.Item
-                        name="roomId"
-                        label="Phòng"
-                        rules={[
-                            { required: true, message: 'Vui lòng chọn phòng' },
-                        ]}
+                    <Btn
+                        variant="accent"
+                        block
+                        loading={busy}
+                        style={{ marginTop: 16 }}
+                        onClick={onFind}
                     >
-                        <Select
-                            placeholder="Chọn phòng cần xóa booking"
-                            size="large"
-                        >
-                            {ROOM_OPTIONS.map((room) => (
-                                <Select.Option
-                                    key={room.value}
-                                    value={room.value}
-                                >
-                                    {room.label}
-                                </Select.Option>
-                            ))}
-                        </Select>
-                    </Form.Item>
+                        {busy ? 'Đang tìm…' : 'Tìm booking'}
+                    </Btn>
 
-                    <Form.Item
-                        name="date"
-                        label="Ngày đặt phòng"
-                        rules={[
-                            { required: true, message: 'Vui lòng chọn ngày' },
-                        ]}
-                    >
-                        <DatePicker
-                            format="DD/MM/YYYY"
-                            placeholder="Chọn ngày cần xóa booking"
-                            size="large"
-                            style={{ width: '100%' }}
-                        />
-                    </Form.Item>
-
-                    <Form.Item>
-                        <Button
-                            type="primary"
-                            htmlType="submit"
-                            size="large"
-                            block
-                            loading={loading}
-                            style={{ marginBottom: 8 }}
-                        >
-                            {loading ? 'Đang tìm kiếm...' : 'Tìm kiếm booking'}
-                        </Button>
-                    </Form.Item>
-                </Form>
-
-                {bookingFound && currentBooking && (
-                    <Card
-                        title={
-                            <span style={{ color: '#ff4d4f' }}>
-                                <ExclamationCircleOutlined
-                                    style={{ marginRight: 8 }}
-                                />
-                                Booking được tìm thấy
-                            </span>
-                        }
-                        style={{ marginBottom: 16 }}
-                    >
+                    {emptyCell && (
                         <div
-                            style={{
-                                background: '#fff2f0',
-                                padding: 16,
-                                borderRadius: 8,
-                                border: '1px solid #ffccc7',
-                            }}
+                            className="ad-result ad-result--free"
+                            style={{ marginTop: 20 }}
                         >
-                            <div style={{ marginBottom: 12 }}>
-                                <Text
-                                    strong
-                                    style={{
-                                        display: 'block',
-                                        marginBottom: 4,
-                                    }}
-                                >
-                                    Thông tin booking:
-                                </Text>
+                            <div className="ad-result__head">
+                                <span className="ad-result__ico">✓</span>
+                                <div>
+                                    <div className="ad-result__title">
+                                        Phòng đang trống
+                                    </div>
+                                    <div className="ad-result__sub">
+                                        Không có booking nào cần xoá.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {booking && (
+                        <>
+                            <div
+                                style={{
+                                    marginTop: 20,
+                                    borderRadius: 16,
+                                    overflow: 'hidden',
+                                    border: '1px solid #eecdc7',
+                                }}
+                            >
                                 <div
                                     style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '120px 1fr',
-                                        gap: '8px',
-                                        marginBottom: 8,
+                                        padding: '16px 18px',
+                                        background: 'var(--ad-book-bg)',
                                     }}
                                 >
-                                    <Text strong>Phòng:</Text>
-                                    <Text>{currentBooking.roomLabel}</Text>
-                                    <Text strong>Ngày:</Text>
-                                    <Text>{currentBooking.date}</Text>
-                                    <Text strong>Chi tiết:</Text>
-                                    <Text style={{ color: '#1890ff' }}>
-                                        {currentBooking.value}
-                                    </Text>
+                                    <div
+                                        className="ad-card__k"
+                                        style={{ color: 'var(--ad-book-fg)' }}
+                                    >
+                                        TÌM THẤY BOOKING
+                                    </div>
+                                    <div
+                                        className="ad-display"
+                                        style={{ fontSize: 20, marginTop: 8 }}
+                                    >
+                                        {booking.guestName}
+                                    </div>
+                                </div>
+                                <div
+                                    className="ad-kv"
+                                    style={{
+                                        background: 'var(--ad-paper)',
+                                        padding: '16px 18px',
+                                    }}
+                                >
+                                    <div>
+                                        <div className="ad-kv__k">Phòng</div>
+                                        <div className="ad-kv__v">
+                                            {found.room.label}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="ad-kv__k">Ngày</div>
+                                        <div className="ad-kv__v ad-num">
+                                            {found.date}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="ad-kv__k">
+                                            Kỳ lưu trú
+                                        </div>
+                                        <div className="ad-kv__v ad-num">
+                                            {booking.checkIn} · {booking.nights}{' '}
+                                            đêm
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="ad-kv__k">Tiền cọc</div>
+                                        <div className="ad-kv__v ad-num">
+                                            {booking.deposit
+                                                ? formatVnd(booking.deposit)
+                                                : '—'}
+                                        </div>
+                                    </div>
+                                    {booking.note && (
+                                        <div className="ad-kv__wide">
+                                            <div className="ad-kv__k">
+                                                Ghi chú
+                                            </div>
+                                            <div className="ad-kv__v">
+                                                {booking.note}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
-                            <Button
-                                type="primary"
-                                danger
-                                size="large"
-                                block
-                                icon={<DeleteOutlined />}
-                                onClick={confirmRemoval}
-                                loading={loading}
-                            >
-                                Xóa booking này
-                            </Button>
-                        </div>
-                    </Card>
-                )}
-
-                {!bookingFound &&
-                    currentBooking === null &&
-                    form.getFieldsValue().roomId &&
-                    form.getFieldsValue().date && (
-                        <Card>
-                            <div style={{ textAlign: 'center', padding: 20 }}>
-                                <CheckCircleOutlined
-                                    style={{
-                                        fontSize: 48,
-                                        color: '#52c41a',
-                                        marginBottom: 16,
-                                    }}
-                                />
-                                <Title level={4} style={{ color: '#52c41a' }}>
-                                    Phòng đang trống
-                                </Title>
-                                <Text>
-                                    Không có booking nào cần xóa cho phòng và
-                                    ngày đã chọn.
-                                </Text>
+                            <div className="ad-actions">
+                                <Btn
+                                    variant="danger"
+                                    grow
+                                    onClick={() => setConfirming('night')}
+                                >
+                                    Xoá đêm này
+                                </Btn>
+                                {multiNight && (
+                                    <Btn
+                                        variant="quiet"
+                                        grow
+                                        onClick={() => setConfirming('stay')}
+                                    >
+                                        Xoá cả {booking.nights} đêm
+                                    </Btn>
+                                )}
                             </div>
-                        </Card>
+                        </>
                     )}
+                </div>
 
-                <Card
-                    style={{
-                        marginTop: 16,
-                        background: '#f6ffed',
-                        border: '1px solid #b7eb8f',
-                    }}
-                >
-                    <Title
-                        level={5}
-                        style={{ color: '#389e0d', marginBottom: 8 }}
-                    >
-                        💡 Hướng dẫn sử dụng:
-                    </Title>
-                    <ol style={{ marginBottom: 0, paddingLeft: 20 }}>
-                        <li>Chọn phòng và ngày cần xóa booking</li>
-                        <li>Nhấn "Tìm kiếm booking" để kiểm tra</li>
-                        <li>
-                            Nếu có booking, xác nhận xóa bằng cách nhấn "Xóa
-                            booking này"
-                        </li>
-                        <li>Xác nhận lần nữa trong popup để hoàn tất</li>
-                    </ol>
-                </Card>
+                <div>
+                    <div className="ad-card" style={{ marginTop: 18 }} data-reveal>
+                        <div className="ad-card__k">4 BƯỚC</div>
+                        <ol className="ad-steps">
+                            {STEPS.map((step, index) => (
+                                <li key={step}>
+                                    <span className="ad-num">
+                                        {String(index + 1).padStart(2, '0')}
+                                    </span>
+                                    {step}
+                                </li>
+                            ))}
+                        </ol>
+                        <p className="ad-hint" style={{ marginTop: 14 }}>
+                            Mọi thao tác xoá đều được ghi lại trong bảng
+                            booking_audit, nên vẫn khôi phục được bằng tay nếu
+                            xoá nhầm.
+                        </p>
+                    </div>
+                </div>
             </div>
-        </div>
+
+            {confirming && booking && (
+                <ConfirmSheet
+                    title={
+                        confirming === 'stay'
+                            ? 'Xoá cả kỳ lưu trú?'
+                            : 'Xoá đêm này?'
+                    }
+                    busy={busy}
+                    confirmLabel={confirming === 'stay' ? 'Xoá cả kỳ' : 'Xoá'}
+                    body={
+                        <>
+                            {found.room.label} · {booking.guestName}
+                            <br />
+                            {confirming === 'stay'
+                                ? `Toàn bộ ${booking.nights} đêm từ ${booking.checkIn}.`
+                                : `Chỉ đêm ${found.date}. Các đêm khác của kỳ này giữ nguyên.`}
+                            <br />
+                            <b style={{ color: 'var(--ad-book-fg)' }}>
+                                Hành động này không thể hoàn tác.
+                            </b>
+                        </>
+                    }
+                    onCancel={() => setConfirming(null)}
+                    onConfirm={onRemove}
+                />
+            )}
+        </AdminShell>
     );
 };
 

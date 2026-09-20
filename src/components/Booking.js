@@ -1,393 +1,334 @@
-import React, { useState, memo, useCallback } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { message } from 'antd';
+import AdminShell from '../admin/AdminShell';
 import {
-    Form,
-    Input,
-    InputNumber,
-    Button,
-    message,
-    Typography,
-    Modal,
-    Select,
-    DatePicker,
-} from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
-import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import { useAuth } from '../App';
-import { ROOM_OPTIONS } from '../constants/roomOptions';
-import './styles.css';
+    Btn,
+    ConfirmSheet,
+    DateField,
+    Field,
+    NightStepper,
+    RoomChips,
+    Segmented,
+    useBusy,
+} from '../admin/ui';
+import {
+    createBooking,
+    getRooms,
+    parseAmount,
+    formatVnd,
+    toApiDate,
+    shortRoomName,
+} from '../admin/api';
 
-// Extend dayjs with the isSameOrBefore plugin
-dayjs.extend(isSameOrBefore);
+// Giá trị khớp enum booking_status trong CSDL.
+const STATUS_DEPOSIT = 'booked';
+const STATUS_PENDING = 'wait';
 
-const { Title } = Typography;
-
-const SPREADSHEET_ID =
-    process.env.REACT_APP_SPREADSHEET_ID ||
-    '1re26jyCc2_gebIn5BRW7DTHAR6QmFTB7k5iSC3UhRrc';
-const SHEET_NAME = 'Sheet1';
+const emptyForm = {
+    roomIds: [],
+    fromDate: null,
+    nights: 1,
+    name: '',
+    phone: '',
+    note: '',
+    status: STATUS_DEPOSIT,
+    price: '',
+};
 
 const Booking = memo(() => {
-    const [form] = Form.useForm();
-    const [roomStatus, setRoomStatus] = useState(null);
-    const navigate = useNavigate();
-    const { makeApiCall } = useAuth();
+    const [rooms, setRooms] = useState([]);
+    const [form, setForm] = useState(emptyForm);
+    const [busy, run] = useBusy();
+    // { conflicts: [...], token: '...' } khi máy chủ báo có ô đã kín
+    const [conflict, setConflict] = useState(null);
 
-    // Function to convert column index to Excel column letter(s) - memoized
-    const getColumnLetter = useCallback((columnIndex) => {
-        let result = '';
-        let index = columnIndex;
-
-        while (index >= 0) {
-            result = String.fromCharCode(65 + (index % 26)) + result;
-            index = Math.floor(index / 26) - 1;
-        }
-
-        return result;
+    useEffect(() => {
+        getRooms()
+            .then((data) => setRooms(data.options))
+            .catch(() => setRooms([]));
     }, []);
 
-    const onFinish = useCallback(
-        async ({ fromDate, numberOfNights, roomIds, name, value, price }) => {
-            try {
-                if (
-                    !fromDate ||
-                    !numberOfNights ||
-                    !roomIds ||
-                    roomIds.length === 0
-                ) {
-                    message.error(
-                        'Vui lòng chọn ngày nhận phòng, số đêm lưu trú và ít nhất một phòng'
-                    );
-                    return;
-                }
+    const set = (patch) => setForm((prev) => ({ ...prev, ...patch }));
 
-                if (numberOfNights <= 0) {
-                    message.error('Số đêm lưu trú phải lớn hơn 0');
-                    return;
-                }
+    const dateRange = useMemo(() => {
+        if (!form.fromDate) return [];
+        return Array.from({ length: form.nights }, (_, i) =>
+            form.fromDate.add(i, 'day').format('DD/MM')
+        );
+    }, [form.fromDate, form.nights]);
 
-                // Generate array of dates from fromDate for numberOfNights
-                const dateRange = [];
-                let currentDate = fromDate.clone();
-                for (let i = 0; i < numberOfNights; i++) {
-                    dateRange.push(currentDate.format('DD/MM/YYYY'));
-                    currentDate = currentDate.add(1, 'day');
-                }
+    const deposit = parseAmount(form.price);
 
-                const endDate = fromDate.clone().add(numberOfNights - 1, 'day');
-
-                message.info(
-                    `Đang cập nhật ${numberOfNights} đêm cho ${
-                        roomIds.length
-                    } phòng (${fromDate.format(
-                        'DD/MM/YYYY'
-                    )} - ${endDate.format('DD/MM/YYYY')}): ${dateRange.join(
-                        ', '
-                    )}`
-                );
-
-                const readRes = await makeApiCall(() =>
-                    window.gapi.client.sheets.spreadsheets.values.get({
-                        spreadsheetId: SPREADSHEET_ID,
-                        range: `${SHEET_NAME}`,
-                    })
-                );
-
-                const data = readRes.result.values;
-                const headers = data[0];
-
-                // Process each room
-                const allDataToUpdate = [];
-                const invalidRooms = [];
-
-                for (const roomId of roomIds) {
-                    const roomRowIndex = data.findIndex(
-                        (row) => row && row[1] === roomId
-                    );
-
-                    if (roomRowIndex === -1) {
-                        invalidRooms.push(roomId);
-                        continue;
-                    }
-
-                    // Check which dates exist in the sheet for this room
-                    const validDates = [];
-                    const invalidDates = [];
-
-                    for (const formattedDate of dateRange) {
-                        const dateIndex = headers.indexOf(formattedDate);
-                        if (dateIndex === -1) {
-                            invalidDates.push(formattedDate);
-                        } else {
-                            validDates.push(formattedDate);
-                            const currentValue =
-                                data?.[roomRowIndex]?.[dateIndex] || '';
-                            allDataToUpdate.push({
-                                roomId,
-                                date: formattedDate,
-                                dateIndex,
-                                currentValue,
-                                roomRowIndex,
-                                columnLetter: getColumnLetter(dateIndex),
-                                range: `${SHEET_NAME}!${getColumnLetter(
-                                    dateIndex
-                                )}${roomRowIndex + 1}`,
-                            });
-                        }
-                    }
-
-                    if (invalidDates.length > 0) {
-                        message.warning(
-                            `Phòng ${roomId} - Các ngày không tồn tại trong bảng tính: ${invalidDates.join(
-                                ', '
-                            )}`
-                        );
-                    }
-                }
-
-                if (invalidRooms.length > 0) {
-                    message.error(
-                        `Không tìm thấy các phòng sau trong bảng tính: ${invalidRooms.join(
-                            ', '
-                        )}`
-                    );
-                }
-
-                if (allDataToUpdate.length === 0) {
-                    message.error('Không có dữ liệu hợp lệ nào để cập nhật');
-                    return;
-                }
-
-                // Check for existing values and ask for confirmation if needed
-                const existingValues = allDataToUpdate.filter(
-                    (item) => item.currentValue.trim() !== ''
-                );
-                if (existingValues.length > 0) {
-                    const existingInfo = existingValues
-                        .map((item) => `${item.roomId}: ${item.date}`)
-                        .join(', ');
-                    const confirmed = await new Promise((resolve) => {
-                        Modal.confirm({
-                            title: 'Có dữ liệu đã tồn tại',
-                            content: `Các phòng và ngày sau đã có dữ liệu: ${existingInfo}. Bạn có chắc muốn ghi đè không?`,
-                            okText: 'Ghi đè tất cả',
-                            cancelText: 'Hủy',
-                            onOk: () => resolve(true),
-                            onCancel: () => resolve(false),
-                        });
-                    });
-                    if (!confirmed) return;
-                }
-
-                // Prepare batch update data
-                const composedValue = `${name} - ${value}${
-                    value === 'Đã đặt cọc' && price ? ` - ${price}` : ''
-                }`;
-
-                const batchUpdateData = {
-                    requests: allDataToUpdate.map((item) => ({
-                        updateCells: {
-                            range: {
-                                sheetId: 0, // Assuming first sheet
-                                startRowIndex: item.roomRowIndex,
-                                endRowIndex: item.roomRowIndex + 1,
-                                startColumnIndex: item.dateIndex,
-                                endColumnIndex: item.dateIndex + 1,
-                            },
-                            rows: [
-                                {
-                                    values: [
-                                        {
-                                            userEnteredValue: {
-                                                stringValue: composedValue,
-                                            },
-                                        },
-                                    ],
-                                },
-                            ],
-                            fields: 'userEnteredValue',
-                        },
-                    })),
-                };
-
-                // Execute batch update
-                await makeApiCall(() =>
-                    window.gapi.client.sheets.spreadsheets.batchUpdate({
-                        spreadsheetId: SPREADSHEET_ID,
-                        resource: batchUpdateData,
-                    })
-                );
-
-                message.success(
-                    `Đã đặt phòng thành công ${numberOfNights} đêm cho ${roomIds.length} phòng! (${allDataToUpdate.length} ô đã cập nhật)`
-                );
-                form.resetFields();
-                setRoomStatus(null);
-            } catch (error) {
-                console.error('Sheet update failed:', error);
-                message.error('Failed to update sheet');
+    /**
+     * Gửi yêu cầu tạo booking.
+     *
+     * Máy chủ dùng giao thức hai pha (xem hàm create_booking trong
+     * supabase/migrations/0002_functions.sql):
+     *   lần 1  -> nếu có đêm đã kín, trả về danh sách xung đột kèm token,
+     *            KHÔNG ghi gì.
+     *   lần 2  -> gửi lại kèm token. Nếu trong lúc người dùng đang xem hộp
+     *            xác nhận mà dữ liệu đổi, token lệch và máy chủ từ chối —
+     *            tránh xoá nhầm booking mà người dùng chưa hề thấy.
+     */
+    const submit = useCallback(
+        async (overwrite = false, conflictToken = null, retried = false) => {
+            if (!form.roomIds.length) {
+                message.error('Vui lòng chọn ít nhất một phòng');
+                return;
             }
+            if (!form.fromDate) {
+                message.error('Vui lòng chọn ngày nhận phòng');
+                return;
+            }
+            if (!form.name.trim()) {
+                message.error('Vui lòng nhập tên khách hàng');
+                return;
+            }
+            if (form.status === STATUS_DEPOSIT && deposit <= 0) {
+                message.error('Vui lòng nhập tiền đặt cọc');
+                return;
+            }
+
+            await run(async () => {
+                try {
+                    const result = await createBooking({
+                        roomIds: form.roomIds,
+                        checkIn: toApiDate(form.fromDate),
+                        nights: form.nights,
+                        guestName: form.name.trim(),
+                        guestPhone: form.phone.trim() || null,
+                        note: form.note.trim() || null,
+                        status: form.status,
+                        deposit,
+                        overwrite,
+                        conflictToken,
+                    });
+
+                    if (
+                        result.code === 'conflict' ||
+                        result.code === 'conflict_changed'
+                    ) {
+                        setConflict({
+                            conflicts: result.conflicts,
+                            token: result.conflictToken,
+                        });
+                        if (result.code === 'conflict_changed') {
+                            message.warning(
+                                'Dữ liệu vừa thay đổi, vui lòng xem lại danh sách bên dưới.'
+                            );
+                        }
+                        return;
+                    }
+
+                    // Có người chen vào đúng lúc — thử lại một lần.
+                    if (result.code === 'conflict_race' && !retried) {
+                        return submit(overwrite, conflictToken, true);
+                    }
+
+                    if (result.ok !== true) {
+                        message.error('Không ghi được. Vui lòng thử lại.');
+                        return;
+                    }
+
+                    message.success(
+                        `Đã ghi ${result.nightsWritten} đêm cho ${form.roomIds.length} phòng`
+                    );
+                    setForm(emptyForm);
+                    setConflict(null);
+                } catch (error) {
+                    console.error('Booking failed:', error);
+                    message.error(
+                        error.message || 'Ghi dữ liệu thất bại. Thử lại sau.'
+                    );
+                }
+            });
         },
-        [makeApiCall, getColumnLetter, form]
+        [form, deposit, run]
     );
 
-    const handleNavigateHome = useCallback(() => navigate('/'), [navigate]);
-
     return (
-        <div className="content-container">
-            <div className="page-wrapper">
-                <Button
-                    icon={<ArrowLeftOutlined />}
-                    onClick={handleNavigateHome}
-                    type="text"
-                    className="back-button"
-                >
-                    Về trang chủ
-                </Button>
-                <Title level={3} className="page-title">
-                    📘 Đặt phòng
-                </Title>
-
-                <Form
-                    form={form}
-                    layout="vertical"
-                    onFinish={onFinish}
-                    className="booking-form"
-                >
-                    <Form.Item
-                        name="roomIds"
-                        label="Phòng cần đặt (có thể chọn nhiều)"
-                        rules={[
-                            {
-                                required: true,
-                                message: 'Vui lòng chọn ít nhất một phòng',
-                            },
-                        ]}
-                    >
-                        <Select
-                            mode="multiple"
-                            placeholder="Chọn phòng cần đặt (có thể chọn nhiều)"
-                            size="large"
-                            maxTagCount="responsive"
-                        >
-                            {ROOM_OPTIONS.map((room) => (
-                                <Select.Option
-                                    key={room.value}
-                                    value={room.value}
-                                >
-                                    {room.label}
-                                </Select.Option>
-                            ))}
-                        </Select>
-                    </Form.Item>
-
-                    <Form.Item
-                        name="fromDate"
-                        label="Ngày nhận phòng"
-                        rules={[
-                            {
-                                required: true,
-                                message: 'Vui lòng chọn ngày nhận phòng',
-                            },
-                        ]}
-                    >
-                        <DatePicker
-                            format="DD/MM/YYYY"
-                            placeholder="Chọn ngày nhận phòng"
-                            size="large"
-                            style={{ width: '100%' }}
+        <AdminShell back eyebrow="GHI VÀO CƠ SỞ DỮ LIỆU" title="Đặt phòng">
+            <div className="ad-cols">
+                <div>
+                    <Field label="Chọn phòng · nhiều phòng">
+                        <RoomChips
+                            options={rooms}
+                            value={form.roomIds}
+                            onChange={(roomIds) => set({ roomIds })}
                         />
-                    </Form.Item>
+                    </Field>
 
-                    <Form.Item
-                        name="numberOfNights"
-                        label="Số đêm lưu trú"
-                        rules={[
-                            {
-                                required: true,
-                                message: 'Vui lòng nhập số đêm lưu trú',
-                            },
-                            {
-                                type: 'number',
-                                min: 1,
-                                max: 30,
-                                message: 'Số đêm phải từ 1 đến 30',
-                            },
-                        ]}
-                    >
-                        <InputNumber
-                            placeholder="Ví dụ: 3"
-                            size="large"
-                            min={1}
-                            max={30}
-                            style={{ width: '100%' }}
+                    <div className="ad-pair" style={{ marginTop: 16 }}>
+                        <div>
+                            <label className="ad-label">Ngày nhận phòng</label>
+                            <DateField
+                                value={form.fromDate}
+                                onChange={(fromDate) => set({ fromDate })}
+                            />
+                        </div>
+                        <div className="ad-pair__fixed">
+                            <label className="ad-label">Số đêm</label>
+                            <NightStepper
+                                value={form.nights}
+                                onChange={(nights) => set({ nights })}
+                            />
+                        </div>
+                    </div>
+
+                    <Field label="Tên khách hàng">
+                        <input
+                            className="ad-input"
+                            placeholder="Ví dụ: Anh Minh"
+                            value={form.name}
+                            onChange={(event) =>
+                                set({ name: event.target.value })
+                            }
                         />
-                    </Form.Item>
+                    </Field>
 
-                    <Form.Item
-                        name="name"
-                        label="Tên khách hàng"
-                        rules={[
-                            { required: true, message: 'Please enter name' },
-                        ]}
-                    >
-                        <Input placeholder="e.g. mh" size="large" />
-                    </Form.Item>
+                    <Field label="Số điện thoại (không bắt buộc)">
+                        <input
+                            className="ad-input ad-num"
+                            type="tel"
+                            placeholder="0903 664 474"
+                            value={form.phone}
+                            onChange={(event) =>
+                                set({ phone: event.target.value })
+                            }
+                        />
+                    </Field>
 
-                    <Form.Item
-                        name="value"
-                        label="Trạng thái phòng"
-                        rules={[
-                            {
-                                required: true,
-                                message: 'Please chọn trạng thái phòng',
-                            },
-                        ]}
-                    >
-                        <Select
-                            placeholder="Chọn trạng thái"
-                            onChange={(val) => setRoomStatus(val)}
+                    <Field label="Trạng thái">
+                        <Segmented
+                            value={form.status}
+                            onChange={(status) => set({ status })}
                             options={[
-                                { label: 'Đã đặt cọc', value: 'Đã đặt cọc' },
+                                { value: STATUS_DEPOSIT, label: 'Đã đặt cọc' },
                                 {
-                                    label: 'Đang đợi đặt cọc',
-                                    value: 'Đang đợi đặt cọc',
+                                    value: STATUS_PENDING,
+                                    label: 'Đang đợi cọc',
                                 },
                             ]}
-                            size="large"
                         />
-                    </Form.Item>
+                    </Field>
 
-                    {roomStatus === 'Đã đặt cọc' && (
-                        <Form.Item
-                            name="price"
-                            label="Tiền đặt cọc"
-                            rules={[
-                                {
-                                    required: true,
-                                    message: 'Vui lòng nhập tiền cọc',
-                                },
-                            ]}
-                        >
-                            <Input placeholder="e.g. 500" size="large" />
-                        </Form.Item>
+                    {form.status === STATUS_DEPOSIT && (
+                        <Field label="Tiền đặt cọc">
+                            <div className="ad-input ad-input--suffix">
+                                <input
+                                    style={{
+                                        flex: 1,
+                                        minWidth: 0,
+                                        border: 0,
+                                        outline: 'none',
+                                        background: 'none',
+                                        font: 'inherit',
+                                        fontVariantNumeric: 'tabular-nums',
+                                    }}
+                                    placeholder="500.000"
+                                    value={form.price}
+                                    onChange={(event) =>
+                                        set({ price: event.target.value })
+                                    }
+                                />
+                                <span className="ad-input__suffix">₫</span>
+                            </div>
+                        </Field>
                     )}
 
-                    <Form.Item>
-                        <Button
-                            type="primary"
-                            htmlType="submit"
-                            className="booking-button"
-                            size="large"
-                            block
+                    <Field label="Ghi chú (không bắt buộc)">
+                        <input
+                            className="ad-input"
+                            placeholder="Ví dụ: đến muộn sau 20:00"
+                            value={form.note}
+                            onChange={(event) =>
+                                set({ note: event.target.value })
+                            }
+                        />
+                    </Field>
+                </div>
+
+                <div>
+                    <div
+                        className="ad-note"
+                        style={{ marginTop: 16 }}
+                        data-reveal
+                    >
+                        <div>
+                            Sẽ ghi{' '}
+                            <b>{form.roomIds.length * form.nights} đêm</b> ·{' '}
+                            {form.roomIds.length} phòng × {form.nights} đêm
+                        </div>
+                        <div className="ad-num" style={{ marginTop: 6 }}>
+                            {dateRange.length
+                                ? dateRange.join(' · ')
+                                : 'Chọn ngày nhận phòng để xem trước.'}
+                        </div>
+                        {form.roomIds.length > 0 && (
+                            <div style={{ marginTop: 6 }}>
+                                {form.roomIds
+                                    .map((id) =>
+                                        shortRoomName(
+                                            rooms.find((r) => r.value === id)
+                                                ?.label
+                                        )
+                                    )
+                                    .join(' · ')}
+                            </div>
+                        )}
+                        {form.status === STATUS_DEPOSIT && deposit > 0 && (
+                            <div style={{ marginTop: 6 }}>
+                                Tiền cọc: {formatVnd(deposit)}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="ad-actions">
+                        <Btn
+                            variant="quiet"
+                            onClick={() => setForm(emptyForm)}
+                            disabled={busy}
                         >
-                            Xác nhận đặt phòng
-                        </Button>
-                    </Form.Item>
-                </Form>
+                            Xoá form
+                        </Btn>
+                        <Btn
+                            variant="primary"
+                            grow
+                            loading={busy}
+                            onClick={() => submit(false, null)}
+                        >
+                            {busy ? 'Đang ghi…' : 'Lưu đặt phòng'}
+                        </Btn>
+                    </div>
+                </div>
             </div>
-        </div>
+
+            {conflict && (
+                <ConfirmSheet
+                    danger={false}
+                    title="Có đêm đã kín"
+                    confirmLabel="Ghi đè tất cả"
+                    busy={busy}
+                    body={
+                        <>
+                            {conflict.conflicts.length} đêm đã có khách:{' '}
+                            {conflict.conflicts
+                                .map(
+                                    (item) =>
+                                        `${item.roomCode} · ${item.date} (${item.guestName})`
+                                )
+                                .join(', ')}
+                            .
+                            <br />
+                            Ghi đè sẽ xoá những booking đó và thay bằng “
+                            {form.name.trim()}”.
+                        </>
+                    }
+                    onCancel={() => setConflict(null)}
+                    onConfirm={() => submit(true, conflict.token)}
+                />
+            )}
+        </AdminShell>
     );
 });
 

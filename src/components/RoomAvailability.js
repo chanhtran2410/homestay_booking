@@ -1,157 +1,179 @@
-import { useState } from 'react';
-import { Form, Button, Typography, Select, message, DatePicker } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
-import { ROOM_OPTIONS } from '../constants/roomOptions';
-import './styles.css';
-
-const { Title } = Typography;
-
-const SPREADSHEET_ID =
-    process.env.REACT_APP_SPREADSHEET_ID ||
-    '1re26jyCc2_gebIn5BRW7DTHAR6QmFTB7k5iSC3UhRrc';
-const SHEET_NAME = 'Sheet1';
+import React, { useCallback, useEffect, useState } from 'react';
+import { message } from 'antd';
+import AdminShell from '../admin/AdminShell';
+import { Btn, DateField, Field, RoomSelect, useBusy } from '../admin/ui';
+import { getAvailability, getRooms, formatVnd } from '../admin/api';
 
 const RoomAvailability = () => {
-    const [form] = Form.useForm();
-    const [result, setResult] = useState('');
-    const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
-    const { makeApiCall } = useAuth();
+    const [rooms, setRooms] = useState([]);
+    const [roomId, setRoomId] = useState(null);
+    const [date, setDate] = useState(null);
+    const [result, setResult] = useState(null);
+    const [busy, run] = useBusy();
 
-    const onFinish = async ({ date, roomId }) => {
-        setLoading(true);
-        setResult(''); // Clear previous result
+    useEffect(() => {
+        getRooms()
+            .then((data) => setRooms(data.options))
+            .catch(() => setRooms([]));
+    }, []);
 
-        try {
-            const formattedDate = date.format('DD/MM/YYYY');
-
-            const readRes = await makeApiCall(() =>
-                window.gapi.client.sheets.spreadsheets.values.get({
-                    spreadsheetId: SPREADSHEET_ID,
-                    range: `${SHEET_NAME}`,
-                })
-            );
-
-            const data = readRes.result.values;
-
-            if (!data || data.length === 0) {
-                message.error('Không có dữ liệu trong bảng tính');
-                return;
-            }
-
-            const headers = data[0];
-            const dateIndex = headers.indexOf(formattedDate);
-            const roomRowIndex = data.findIndex(
-                (row) => row && row[1] === roomId
-            );
-
-            if (dateIndex === -1) {
-                message.error(
-                    `Không tìm thấy ngày "${formattedDate}" trong bảng tính`
-                );
-                return;
-            }
-
-            if (roomRowIndex === -1) {
-                message.error(
-                    `Không tìm thấy phòng "${roomId}" trong bảng tính`
-                );
-                return;
-            }
-
-            const cellValue = data?.[roomRowIndex]?.[dateIndex] || '';
-
-            // Enhanced result display with more context
-            if (
-                cellValue.trim() === '' ||
-                cellValue === undefined ||
-                cellValue === null
-            ) {
-                setResult('🟢 Phòng trống');
-            } else {
-                setResult(`🔴 Đã đặt: ${cellValue}`);
-            }
-
-            console.log(`Room ${roomId} on ${date}: "${cellValue}"`);
-        } catch (error) {
-            console.error('Error reading sheet:', error);
-            message.error('Lỗi khi kiểm tra phòng. Vui lòng thử lại.');
-        } finally {
-            setLoading(false);
+    const onCheck = useCallback(async () => {
+        if (!roomId) {
+            message.error('Vui lòng chọn phòng');
+            return;
         }
-    };
+        if (!date) {
+            message.error('Vui lòng chọn ngày');
+            return;
+        }
+
+        await run(async () => {
+            setResult(null);
+            try {
+                const data = await getAvailability(date, roomId);
+                setResult({ ...data.rooms[0], date: data.date });
+            } catch (error) {
+                console.error('Error checking room:', error);
+                message.error(
+                    error.message || 'Lỗi khi kiểm tra phòng. Vui lòng thử lại.'
+                );
+            }
+        });
+    }, [roomId, date, run]);
+
+    const booking = result?.booking;
 
     return (
-        <div className="content-container">
-            <div className="page-wrapper">
-                <Button
-                    icon={<ArrowLeftOutlined />}
-                    onClick={() => navigate('/')}
-                    type="text"
-                    className="back-button"
-                >
-                    Về trang chủ
-                </Button>
-                <Title level={3} className="page-title">
-                    📅 Kiểm tra tình trạng phòng
-                </Title>
-
-                <Form form={form} layout="vertical" onFinish={onFinish}>
-                    <Form.Item
-                        name="roomId"
-                        label="Phòng"
-                        rules={[{ required: true, message: 'Chọn phòng' }]}
-                    >
-                        <Select placeholder="Chọn phòng" size="large">
-                            {ROOM_OPTIONS.map((room) => (
-                                <Select.Option
-                                    key={room.value}
-                                    value={room.value}
-                                >
-                                    {room.label}
-                                </Select.Option>
-                            ))}
-                        </Select>
-                    </Form.Item>
-
-                    <Form.Item
-                        name="date"
-                        label="Ngày (tiêu đề cột)"
-                        rules={[{ required: true, message: 'Nhập ngày' }]}
-                        extra="Nhập ngày theo định dạng trong bảng tính (ví dụ: 1/5, 2/1, etc.)"
-                    >
-                        <DatePicker
-                            format="DD/MM/YYYY"
-                            placeholder="Chọn ngày"
-                            size="large"
-                            style={{ width: '100%' }}
+        <AdminShell back eyebrow="TRA CỨU NHANH" title="Kiểm tra phòng">
+            <div className="ad-cols">
+                <div>
+                    <Field label="Phòng">
+                        <RoomSelect
+                            options={rooms}
+                            value={roomId}
+                            onChange={setRoomId}
                         />
-                    </Form.Item>
+                    </Field>
 
-                    <Form.Item>
-                        <Button
-                            type="primary"
-                            htmlType="submit"
-                            size="large"
-                            block
-                            loading={loading}
+                    <Field label="Ngày">
+                        <DateField value={date} onChange={setDate} />
+                    </Field>
+
+                    <Btn
+                        variant="accent"
+                        block
+                        loading={busy}
+                        style={{ marginTop: 18 }}
+                        onClick={onCheck}
+                    >
+                        {busy ? 'Đang kiểm tra…' : 'Kiểm tra'}
+                    </Btn>
+                </div>
+
+                <div>
+                    {result && result.kind === 'free' && (
+                        <div
+                            className="ad-result ad-result--free"
+                            style={{ marginTop: 16 }}
                         >
-                            {loading ? 'Đang kiểm tra...' : 'Kiểm tra'}
-                        </Button>
-                    </Form.Item>
-                </Form>
-
-                {result && (
-                    <div className="result-display">
-                        <div className="result-text">
-                            ✅ Trạng thái: {result}
+                            <div className="ad-result__head">
+                                <span className="ad-result__ico">✓</span>
+                                <div>
+                                    <div className="ad-result__title">
+                                        Phòng trống
+                                    </div>
+                                    <div className="ad-result__sub ad-num">
+                                        {result.room.value} · {result.date}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+
+                    {result && result.kind !== 'free' && (
+                        <div
+                            className="ad-result ad-result--busy"
+                            style={{ marginTop: 16 }}
+                        >
+                            <div className="ad-result__head">
+                                <span className="ad-result__ico">●</span>
+                                <div>
+                                    <div className="ad-result__title">
+                                        {result.kind === 'booked'
+                                            ? 'Đã có khách'
+                                            : result.kind === 'wait'
+                                            ? 'Đang đợi cọc'
+                                            : 'Phòng đã ngừng khai thác'}
+                                    </div>
+                                    <div className="ad-result__sub ad-num">
+                                        {result.room.value} · {result.date}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {booking && (
+                                <div className="ad-result__cell">
+                                    <div className="ad-card__k">
+                                        THÔNG TIN ĐẶT PHÒNG
+                                    </div>
+                                    <div className="ad-kv" style={{ marginTop: 10 }}>
+                                        <div>
+                                            <div className="ad-kv__k">Khách</div>
+                                            <div className="ad-kv__v">
+                                                {booking.guestName}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="ad-kv__k">
+                                                Tiền cọc
+                                            </div>
+                                            <div className="ad-kv__v ad-num">
+                                                {booking.deposit
+                                                    ? formatVnd(booking.deposit)
+                                                    : '—'}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="ad-kv__k">
+                                                Nhận phòng
+                                            </div>
+                                            <div className="ad-kv__v ad-num">
+                                                {booking.checkIn} ·{' '}
+                                                {booking.nights} đêm
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="ad-kv__k">
+                                                Điện thoại
+                                            </div>
+                                            <div className="ad-kv__v ad-num">
+                                                {booking.guestPhone || '—'}
+                                            </div>
+                                        </div>
+                                        {booking.note && (
+                                            <div className="ad-kv__wide">
+                                                <div className="ad-kv__k">
+                                                    Ghi chú
+                                                </div>
+                                                <div className="ad-kv__v">
+                                                    {booking.note}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {result && (
+                        <p className="ad-hint" style={{ marginTop: 12 }}>
+                            {result.room.label} · {result.meta}
+                        </p>
+                    )}
+                </div>
             </div>
-        </div>
+        </AdminShell>
     );
 };
 

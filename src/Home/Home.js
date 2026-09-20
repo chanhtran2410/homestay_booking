@@ -1,169 +1,185 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Spin, Card, Row, Col, Typography } from 'antd';
-import {
-    HomeOutlined,
-    BookOutlined,
-    CalendarOutlined,
-    BarChartOutlined,
-    DeleteOutlined,
-    LogoutOutlined,
-} from '@ant-design/icons';
+import { message } from 'antd';
+import dayjs from 'dayjs';
 import { useAuth } from '../App';
-import './Home.css';
+import AdminShell, { displayName } from '../admin/AdminShell';
+import { Btn, Loading } from '../admin/ui';
+import { compactVnd, getDashboard, shortRoomName } from '../admin/api';
 
-const { Title, Paragraph } = Typography;
+const WEEKDAYS = [
+    'CHỦ NHẬT',
+    'THỨ HAI',
+    'THỨ BA',
+    'THỨ TƯ',
+    'THỨ NĂM',
+    'THỨ SÁU',
+    'THỨ BẢY',
+];
 
 const Home = memo(() => {
     const navigate = useNavigate();
-    const { isSignedIn, handleLogout, isLoading } = useAuth();
+    const { isSignedIn, user } = useAuth();
 
-    const handleNavigateToBooking = useCallback(
-        () => navigate('/booking'),
-        [navigate]
-    );
-    const handleNavigateToAvailability = useCallback(
-        () => navigate('/availability'),
-        [navigate]
-    );
-    const handleNavigateToDateChecking = useCallback(
-        () => navigate('/date_checking'),
-        [navigate]
-    );
-    const handleNavigateToMonthChecking = useCallback(
-        () => navigate('/month-checking'),
-        [navigate]
-    );
+    const [loading, setLoading] = useState(true);
+    const [today, setToday] = useState([]);
+    const [summary, setSummary] = useState(null);
 
-    if (isLoading) {
-        return (
-            <div className="loading-container">
-                <Spin size="large" />
-                <div className="loading-text">Đang khởi tạo...</div>
-            </div>
-        );
-    }
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            // Ngày do CLIENT xác định. Server chạy ở UTC nên nếu để nó tự tính
+            // "hôm nay" thì từ 00:00 đến 07:00 giờ Việt Nam sẽ ra ngày hôm trước.
+            const data = await getDashboard(dayjs());
+            setToday(data.today);
+            setSummary(data.summary);
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+            message.error(
+                error.message || 'Lỗi khi tải dữ liệu. Vui lòng thử lại.'
+            );
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    if (!isSignedIn) {
-        return (
-            <div className="loading-container">
-                <div className="loading-text">
-                    Vui lòng đăng nhập để tiếp tục...
+    useEffect(() => {
+        if (isSignedIn) load();
+    }, [isSignedIn, load]);
+
+    const now = dayjs();
+    const freeToday = today.filter((row) => row.kind === 'free').length;
+    const name = displayName(user);
+
+    // Mô tả ngắn cho từng dòng phòng.
+    const statusText = (row) => {
+        if (row.kind === 'free') return 'Trống';
+        if (row.kind === 'unknown') return 'Đã ngừng khai thác';
+        const who = row.booking?.guestName || 'Có khách';
+        return `${who} · ${row.kind === 'booked' ? 'đã cọc' : 'chờ cọc'}`;
+    };
+
+    const headerExtra = (
+        <div className="ad-stats" style={{ marginTop: 18 }}>
+            <div className="ad-stat">
+                <div className="ad-stat__k">Trống hôm nay</div>
+                <div className="ad-stat__v ad-num">
+                    {freeToday}
+                    <small>/{today.length || 6}</small>
                 </div>
             </div>
-        );
-    }
-
-    const menuItems = [
-        {
-            icon: <HomeOutlined />,
-            title: 'Xem phòng homestay',
-            description: 'Khám phá các phòng đẹp và tiện nghi',
-            onClick: () => navigate('/rooms'),
-            color: '#52c41a',
-        },
-        {
-            icon: <BookOutlined />,
-            title: 'Đặt phòng',
-            description: 'Tạo đặt phòng mới cho khách hàng',
-            onClick: handleNavigateToBooking,
-            color: '#1890ff',
-        },
-        {
-            icon: <CalendarOutlined />,
-            title: 'Kiểm tra phòng',
-            description: 'Xem tình trạng phòng theo ngày',
-            onClick: handleNavigateToAvailability,
-            color: '#722ed1',
-        },
-        {
-            icon: <BarChartOutlined />,
-            title: 'Kiểm tra phòng trống trong ngày',
-            description: 'Thống kê phòng trống theo ngày cụ thể',
-            onClick: handleNavigateToDateChecking,
-            color: '#fa8c16',
-        },
-        {
-            icon: <BarChartOutlined />,
-            title: 'Kiểm tra phòng trống trong tháng',
-            description: 'Thống kê phòng trống theo tháng',
-            onClick: handleNavigateToMonthChecking,
-            color: '#eb2f96',
-        },
-        {
-            icon: <DeleteOutlined />,
-            title: 'Xóa đặt phòng',
-            description: 'Hủy hoặc xóa đặt phòng hiện có',
-            onClick: () => navigate('/remove-booking'),
-            color: '#f5222d',
-        },
-    ];
-
-    return (
-        <div className="home-page">
-            {/* Hero Section */}
-            {/* <div className="home-hero-section">
-                <div className="home-hero-content">
-                    <Title level={1} className="home-hero-title">
-                        Quản Lý Homestay
-                    </Title>
-                    <Paragraph className="home-hero-description">
-                        Hệ thống quản lý đặt phòng và kiểm tra tình trạng phòng
-                        trống chuyên nghiệp
-                    </Paragraph>
+            <div className="ad-stat ad-stat--wait">
+                <div className="ad-stat__k">Chờ cọc</div>
+                <div className="ad-stat__v ad-num">
+                    {summary ? summary.counts.wait : '—'}
                 </div>
-            </div> */}
-
-            {/* Menu Cards */}
-            <div className="home-container">
-                <Title level={2} className="home-section-title">
-                    Chức Năng Quản Lý
-                </Title>
-
-                <Row gutter={[24, 24]}>
-                    {menuItems.map((item, index) => (
-                        <Col xs={24} sm={12} lg={8} key={index}>
-                            <Card
-                                className="home-menu-card"
-                                hoverable
-                                onClick={item.onClick}
-                                style={{
-                                    borderTop: `4px solid ${item.color}`,
-                                }}
-                            >
-                                <div className="menu-card-content">
-                                    <div
-                                        className="menu-icon"
-                                        style={{ color: item.color }}
-                                    >
-                                        {item.icon}
-                                    </div>
-                                    <Title level={4} className="menu-title">
-                                        {item.title}
-                                    </Title>
-                                    <Paragraph className="menu-description">
-                                        {item.description}
-                                    </Paragraph>
-                                </div>
-                            </Card>
-                        </Col>
-                    ))}
-                </Row>
-
-                {/* Logout Button */}
-                <div className="home-logout-container">
-                    <Button
-                        type="primary"
-                        size="large"
-                        icon={<LogoutOutlined />}
-                        onClick={handleLogout}
-                        className="home-logout-button"
-                    >
-                        Đăng xuất
-                    </Button>
+            </div>
+            <div className="ad-stat ad-stat--book">
+                <div className="ad-stat__k">Đã cọc</div>
+                <div className="ad-stat__v ad-num">
+                    {summary ? summary.counts.booked : '—'}
                 </div>
             </div>
         </div>
+    );
+
+    return (
+        <AdminShell
+            dark
+            eyebrow={`${WEEKDAYS[now.day()]} · ${now.format('DD/MM/YYYY')}`}
+            title={`Chào ${name}`}
+            headerExtra={headerExtra}
+            actions={
+                <Btn size="sm" onClick={() => navigate('/booking')}>
+                    + Đặt phòng
+                </Btn>
+            }
+        >
+            <div className="ad-stats ad-stats--top" data-reveal>
+                <div className="ad-stat ad-stat--dark">
+                    <div className="ad-stat__k">Trống hôm nay</div>
+                    <div className="ad-stat__v ad-num">
+                        {freeToday}
+                        <small>/{today.length || 6}</small>
+                    </div>
+                </div>
+                <div className="ad-stat ad-stat--book">
+                    <div className="ad-stat__k">Đã đặt cọc</div>
+                    <div className="ad-stat__v ad-num">
+                        {summary ? summary.counts.booked : '—'}
+                    </div>
+                </div>
+                <div className="ad-stat ad-stat--wait">
+                    <div className="ad-stat__k">Đang đợi cọc</div>
+                    <div className="ad-stat__v ad-num">
+                        {summary ? summary.counts.wait : '—'}
+                    </div>
+                </div>
+                <div className="ad-stat">
+                    <div className="ad-stat__k">Doanh thu tháng</div>
+                    <div className="ad-stat__v ad-num">
+                        {summary ? compactVnd(summary.revenue) : '—'}
+                    </div>
+                </div>
+            </div>
+
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    margin: '18px 0 12px',
+                }}
+            >
+                <span style={{ fontSize: 13, fontWeight: 500 }}>
+                    Tình trạng hôm nay
+                </span>
+                <button
+                    type="button"
+                    className="ad-hint"
+                    onClick={() => navigate('/month-checking')}
+                >
+                    Lịch tháng →
+                </button>
+            </div>
+
+            {loading ? (
+                <Loading />
+            ) : (
+                <div className="ad-list" data-reveal>
+                    {today.map((row) => (
+                        <button
+                            key={row.room.value}
+                            type="button"
+                            className={`ad-row is-${row.kind}`}
+                            onClick={() => navigate('/month-checking')}
+                        >
+                            <span className="ad-row__bar" />
+                            <span className="ad-row__main">
+                                <span className="ad-row__name">
+                                    {shortRoomName(row.room.label)}
+                                </span>
+                                <span className="ad-row__meta">
+                                    {statusText(row)}
+                                </span>
+                            </span>
+                            <span className="ad-row__side ad-num">
+                                {row.room.value}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            <Btn
+                variant="primary"
+                block
+                style={{ marginTop: 16 }}
+                onClick={() => navigate('/booking')}
+            >
+                + Đặt phòng mới
+            </Btn>
+        </AdminShell>
     );
 });
 

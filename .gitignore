@@ -13,12 +13,18 @@
 
 # misc
 .DS_Store
+
+# env — chỉ .env.example được commit
 .env
-.env.*.local
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+
+# deployment
+.vercel
+
+# du lieu nhap tu Google Sheet — chua thong tin khach, khong commit
+/scripts/data/
+/scripts/out/
 
 # log files
 npm-debug.log*
